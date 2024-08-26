@@ -1,3 +1,5 @@
+pub mod data;
+
 use axum::{http::StatusCode, routing::get, serve::Serve, Router};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

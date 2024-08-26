@@ -6,11 +6,23 @@ edition = "2021"
 
 [dependencies]
 axum = "0.7.5"
+chrono = "0.4.38"
+kuzu = "0.6.0"
 serde = { version = "1.0.209", features = ["derive"] }
 serde_json = "1.0.127"
+thiserror = "1.0.63"
+time = "0.3.36"
 tokio = { version = "1.39.3", features = ["full"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+[dependencies.uuid]
+version = "1.10.0"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
 
 [dev-dependencies]
 reqwest = "0.12.7"

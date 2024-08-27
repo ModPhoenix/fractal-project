@@ -1,4 +1,4 @@
-use server::data::{create_connection, create_db, create_fractal, DataError};
+use server::data::{create_connection, create_db, create_fractal, get_fractal_by_name, DataError};
 use server::run;
 
 fn setup_database_and_query() -> Result<(), DataError> {
@@ -24,6 +24,10 @@ fn setup_database_and_query() -> Result<(), DataError> {
     let fractal = create_fractal(&db, "Root", None)?;
 
     dbg!("{:?}", fractal);
+
+    let query = get_fractal_by_name(&db, "Root")?;
+
+    dbg!("{:?}", query);
     // conn.query("CREATE NODE TABLE User(name STRING, age INT64, PRIMARY KEY (name))")?;
     // conn.query("CREATE NODE TABLE City(name STRING, population INT64, PRIMARY KEY (name))")?;
     // conn.query("CREATE REL TABLE Follows(FROM User TO User, since INT64)")?;

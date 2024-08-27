@@ -60,7 +60,7 @@ pub fn create_fractal(
 RETURN f.id, f.name, f.createdAt, f.updatedAt
     ";
     let mut stmt = conn.prepare(query)?;
-    let result = conn.execute(
+    let result: kuzu::QueryResult = conn.execute(
         &mut stmt,
         vec![
             ("uuid", Value::UUID(Uuid::new_v4())),
@@ -86,9 +86,13 @@ RETURN f.id, f.name, f.createdAt, f.updatedAt
 
 pub fn get_fractal_by_name(db: &Database, name: &str) -> Result<Fractal, DataError> {
     let conn = create_connection(db)?;
-    let query = "SELECT id, name, createdAt, updatedAt FROM Fractal WHERE name = $name";
+    let query = "
+        MATCH (f:Fractal {name: $name})
+        RETURN f.id, f.name, f.createdAt, f.updatedAt
+    ";
     let mut stmt = conn.prepare(query)?;
-    let mut result = conn.execute(&mut stmt, vec![("name", Value::String(name.to_string()))])?;
+    let params = vec![("name", Value::String(name.to_string()))];
+    let mut result = conn.execute(&mut stmt, params)?;
 
     if let Some(row) = result.next() {
         row_to_fractal(&row)

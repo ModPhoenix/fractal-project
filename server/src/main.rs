@@ -1,4 +1,6 @@
-use server::data::{create_connection, create_db, create_fractal, get_fractal_by_name, DataError};
+use server::data::{
+    create_connection, create_db, create_fractal, get_fractal_by_name, init_database, DataError,
+};
 use server::run;
 
 fn setup_database_and_query() -> Result<(), DataError> {
@@ -7,7 +9,8 @@ fn setup_database_and_query() -> Result<(), DataError> {
     // let conn = Connection::new(&db)?;
 
     let db = create_db("./demo_db")?;
-    // let conn = create_connection(&db)?;
+    let conn = create_connection(&db)?;
+    init_database(&conn)?;
 
     // Create the tables
     //     conn.query(

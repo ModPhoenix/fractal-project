@@ -44,6 +44,36 @@ pub fn create_connection(db: &Database) -> Result<Connection, DataError> {
     Ok(conn)
 }
 
+pub fn init_database(conn: &Connection) -> Result<(), DataError> {
+    println!("Initializing database...");
+
+    let table_exists_query = "
+            MATCH (f:Fractal) RETURN f LIMIT 1
+        ";
+    let mut stmt = conn.prepare(table_exists_query)?;
+    println!("Checking if Fractal table exists...");
+    let result = conn.execute(&mut stmt, vec![])?;
+
+    if result.into_iter().next().is_none() {
+        println!("Fractal table not found. Creating table...");
+        conn.query(
+            "CREATE NODE TABLE Fractal (
+                id UUID,
+                name STRING,
+                createdAt TIMESTAMP,
+                updatedAt TIMESTAMP,
+                PRIMARY KEY (id)
+            );",
+        )?;
+        println!("Fractal table created successfully.");
+    } else {
+        println!("Fractal table already exists.");
+    }
+
+    println!("Database initialization completed.");
+    Ok(())
+}
+
 pub fn create_fractal(
     db: &Database,
     name: &str,
@@ -52,12 +82,12 @@ pub fn create_fractal(
     let conn = create_connection(db)?;
     let query = "
         CREATE (f:Fractal {
-  id: $uuid,
-  name: $name,
-  createdAt: $datetime,
-  updatedAt: $datetime
-})
-RETURN f.id, f.name, f.createdAt, f.updatedAt
+            id: $uuid,
+            name: $name,
+            createdAt: $datetime,
+            updatedAt: $datetime
+        })
+        RETURN f.id, f.name, f.createdAt, f.updatedAt
     ";
     let mut stmt = conn.prepare(query)?;
     let result: kuzu::QueryResult = conn.execute(
@@ -68,6 +98,9 @@ RETURN f.id, f.name, f.createdAt, f.updatedAt
             ("datetime", Value::Timestamp(OffsetDateTime::now_utc())),
         ],
     )?;
+
+    dbg!("{:?}", result.get_compiling_time());
+    dbg!("{:?}", result.get_execution_time());
 
     if let Some(row) = result.into_iter().next() {
         let fractal = row_to_fractal(&row)?;
@@ -93,6 +126,9 @@ pub fn get_fractal_by_name(db: &Database, name: &str) -> Result<Fractal, DataErr
     let mut stmt = conn.prepare(query)?;
     let params = vec![("name", Value::String(name.to_string()))];
     let mut result = conn.execute(&mut stmt, params)?;
+
+    dbg!("{:?}", result.get_compiling_time());
+    dbg!("{:?}", result.get_execution_time());
 
     if let Some(row) = result.next() {
         row_to_fractal(&row)

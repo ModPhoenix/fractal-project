@@ -47,31 +47,61 @@ pub fn create_connection(db: &Database) -> Result<Connection, DataError> {
 pub fn init_database(conn: &Connection) -> Result<(), DataError> {
     println!("Initializing database...");
 
-    let table_exists_query = "
-            MATCH (f:Fractal) RETURN f LIMIT 1
-        ";
-    let mut stmt = conn.prepare(table_exists_query)?;
-    println!("Checking if Fractal table exists...");
-    let result = conn.execute(&mut stmt, vec![])?;
+    // Attempt to create Fractal table
+    match create_fractal_table(conn) {
+        Ok(_) => println!("Fractal table created successfully."),
+        Err(e) => {
+            if is_table_already_exists_error(&e) {
+                println!("Fractal table already exists.");
+            } else {
+                return Err(e);
+            }
+        }
+    }
 
-    if result.into_iter().next().is_none() {
-        println!("Fractal table not found. Creating table...");
-        conn.query(
-            "CREATE NODE TABLE Fractal (
-                id UUID,
-                name STRING,
-                createdAt TIMESTAMP,
-                updatedAt TIMESTAMP,
-                PRIMARY KEY (id)
-            );",
-        )?;
-        println!("Fractal table created successfully.");
-    } else {
-        println!("Fractal table already exists.");
+    // Attempt to create FractalParent table
+    match create_fractal_parent_table(conn) {
+        Ok(_) => println!("FractalParent table created successfully."),
+        Err(e) => {
+            if is_table_already_exists_error(&e) {
+                println!("FractalParent table already exists.");
+            } else {
+                return Err(e);
+            }
+        }
     }
 
     println!("Database initialization completed.");
     Ok(())
+}
+
+fn create_fractal_table(conn: &Connection) -> Result<(), DataError> {
+    conn.query(
+        "CREATE NODE TABLE Fractal (
+            id UUID,
+            name STRING,
+            createdAt TIMESTAMP,
+            updatedAt TIMESTAMP,
+            PRIMARY KEY (id)
+        )",
+    )?;
+    Ok(())
+}
+
+fn create_fractal_parent_table(conn: &Connection) -> Result<(), DataError> {
+    // conn.query("CREATE REL TABLE Follows(FROM Fractal TO Fractal, since INT64)")?;
+    conn.query("CREATE REL TABLE FractalParent(FROM Fractal TO Fractal, since INT64)")?;
+    Ok(())
+}
+
+fn is_table_already_exists_error(error: &DataError) -> bool {
+    if let DataError::Database(kuzu_error) = error {
+        // Check if the error message contains a specific string indicating the table already exists
+        // You may need to adjust this based on the exact error message Kuzu returns
+        kuzu_error.to_string().contains("already exists")
+    } else {
+        false
+    }
 }
 
 pub fn create_fractal(
@@ -105,9 +135,9 @@ pub fn create_fractal(
     if let Some(row) = result.into_iter().next() {
         let fractal = row_to_fractal(&row)?;
 
-        // if let Some(parent_id) = parent_id {
-        //     add_parent_relation(conn, &fractal.id, parent_id).await?;
-        // }
+        if let Some(parent_id) = parent_id {
+            add_parent_relation(&conn, &fractal.id, parent_id)?;
+        }
 
         Ok(fractal)
     } else {
@@ -115,6 +145,30 @@ pub fn create_fractal(
             "Failed to create fractal".to_string(),
         ))
     }
+}
+
+fn add_parent_relation(
+    conn: &Connection,
+    child_id: &Uuid,
+    parent_id: &Uuid,
+) -> Result<(), DataError> {
+    let query = "
+        MATCH (child:Fractal {id: $child_id}), (parent:Fractal {id: $parent_id})
+        CREATE (child)-[:FractalParent {since: $since}]->(parent)
+    ";
+    let mut stmt = conn.prepare(query)?;
+    conn.execute(
+        &mut stmt,
+        vec![
+            ("child_id", Value::UUID(*child_id)),
+            ("parent_id", Value::UUID(*parent_id)),
+            (
+                "since",
+                Value::Int64(OffsetDateTime::now_utc().unix_timestamp()),
+            ),
+        ],
+    )?;
+    Ok(())
 }
 
 pub fn get_fractal_by_name(db: &Database, name: &str) -> Result<Fractal, DataError> {
@@ -135,6 +189,25 @@ pub fn get_fractal_by_name(db: &Database, name: &str) -> Result<Fractal, DataErr
     } else {
         Err(DataError::FractalNotFound(name.to_string()))
     }
+}
+
+pub fn get_fractal_children(db: &Database, id: &Uuid) -> Result<Vec<Fractal>, DataError> {
+    let conn = create_connection(db)?;
+    let query = "
+        MATCH (parent:Fractal {id: $id})<-[:FractalParent]-(child:Fractal)
+        RETURN child.id, child.name, child.createdAt, child.updatedAt
+        ORDER BY child.name
+    ";
+    let mut stmt = conn.prepare(query)?;
+    let params = vec![("id", Value::UUID(*id))];
+    let result = conn.execute(&mut stmt, params)?;
+
+    let mut children = Vec::new();
+    for row in result {
+        children.push(row_to_fractal(&row)?);
+    }
+
+    Ok(children)
 }
 
 // pub async fn get_fractal_children(

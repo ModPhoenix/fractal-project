@@ -1,56 +1,33 @@
 use server::data::{
-    create_connection, create_db, create_fractal, get_fractal_by_name, init_database, DataError,
+    create_connection, create_db, create_fractal, get_fractal_by_name, get_fractal_children,
+    init_database, DataError,
 };
 use server::run;
 
 fn setup_database_and_query() -> Result<(), DataError> {
-    // Create an empty on-disk database and connect to it
-    // let db = Database::new("./demo_db", SystemConfig::default())?;
-    // let conn = Connection::new(&db)?;
-
     let db = create_db("./demo_db")?;
     let conn = create_connection(&db)?;
     init_database(&conn)?;
 
-    // Create the tables
-    //     conn.query(
-    //         "CREATE NODE TABLE Fractal (
-    //     id UUID,
-    //     name STRING,
-    //     createdAt TIMESTAMP,
-    //     updatedAt TIMESTAMP,
-    //     PRIMARY KEY (id)
-    // );
-    // ",
-    //     )?;
+    let root = create_fractal(&db, "Root", None)?;
 
-    let fractal = create_fractal(&db, "Root", None)?;
+    dbg!("{:?}", &root);
 
-    dbg!("{:?}", fractal);
+    let child1 = create_fractal(&db, "Child1", Some(&root.id))?;
+
+    dbg!("{:?}", &child1);
 
     let query = get_fractal_by_name(&db, "Root")?;
 
-    dbg!("{:?}", query);
-    // conn.query("CREATE NODE TABLE User(name STRING, age INT64, PRIMARY KEY (name))")?;
-    // conn.query("CREATE NODE TABLE City(name STRING, population INT64, PRIMARY KEY (name))")?;
-    // conn.query("CREATE REL TABLE Follows(FROM User TO User, since INT64)")?;
-    // conn.query("CREATE REL TABLE LivesIn(FROM User TO City)")?;
+    dbg!("{:?}", &query);
 
-    // Load the data
-    // conn.query("COPY User FROM './data/user.csv'")?;
-    // conn.query("COPY City FROM './data/city.csv'")?;
-    // conn.query("COPY Follows FROM './data/follows.csv'")?;
-    // conn.query("COPY LivesIn FROM './data/lives-in.csv'")?;
+    let fractal_children = get_fractal_children(&db, &query.id)?;
 
-    // let query_result =
-    //     conn.query("MATCH (a:User)-[f:Follows]->(b:User) RETURN a.name, f.since, b.name;")?;
+    dbg!("{:?}", &fractal_children);
+    let child_fractals = fractal_children;
+    let children = child_fractals.len();
+    dbg!("Number of child fractals: {}", children);
 
-    // println!("{:?}", query_result.get_column_data_types());
-
-    // // Print the rows
-    // for row in query_result {
-    //     println!("{}, {}, {}", row[0], row[1], row[2]);
-    // }
     Ok(())
 }
 

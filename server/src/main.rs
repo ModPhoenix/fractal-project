@@ -9,15 +9,15 @@ fn setup_database_and_query() -> Result<(), DataError> {
     let conn = create_connection(&db)?;
     init_database(&conn)?;
 
-    let root = create_fractal(&db, "Root", None)?;
+    let root = create_fractal(&conn, "Root", None)?;
 
     dbg!("{:?}", &root);
 
-    let child1 = create_fractal(&db, "Child1", Some(&root.id))?;
+    let child1 = create_fractal(&conn, "Child1", Some(&root.id))?;
 
     dbg!("{:?}", &child1);
 
-    let query = get_fractal_by_name(&db, "Root")?;
+    let query = get_fractal_by_name(&conn, "Root")?;
 
     dbg!("{:?}", &query);
 

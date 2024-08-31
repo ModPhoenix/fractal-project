@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use kuzu::{Connection, Database, Error as KuzuError, PreparedStatement, SystemConfig, Value};
+use kuzu::{Connection, Database, Error as KuzuError, SystemConfig, Value};
 use std::collections::HashMap;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -47,24 +47,11 @@ pub fn create_connection(db: &Database) -> Result<Connection, DataError> {
 pub fn init_database(conn: &Connection) -> Result<(), DataError> {
     println!("Initializing database...");
 
-    // Attempt to create Fractal table
-    match create_fractal_table(conn) {
-        Ok(_) => println!("Fractal table created successfully."),
+    match create_tables_and_relations(conn) {
+        Ok(_) => println!("Tables and relations created."),
         Err(e) => {
             if is_table_already_exists_error(&e) {
-                println!("Fractal table already exists.");
-            } else {
-                return Err(e);
-            }
-        }
-    }
-
-    // Attempt to create FractalParent table
-    match create_fractal_parent_table(conn) {
-        Ok(_) => println!("FractalParent table created successfully."),
-        Err(e) => {
-            if is_table_already_exists_error(&e) {
-                println!("FractalParent table already exists.");
+                println!("Tables and relations already exist.");
             } else {
                 return Err(e);
             }
@@ -72,25 +59,6 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
     }
 
     println!("Database initialization completed.");
-    Ok(())
-}
-
-fn create_fractal_table(conn: &Connection) -> Result<(), DataError> {
-    conn.query(
-        "CREATE NODE TABLE Fractal (
-            id UUID,
-            name STRING,
-            createdAt TIMESTAMP,
-            updatedAt TIMESTAMP,
-            PRIMARY KEY (id)
-        )",
-    )?;
-    Ok(())
-}
-
-fn create_fractal_parent_table(conn: &Connection) -> Result<(), DataError> {
-    // conn.query("CREATE REL TABLE Follows(FROM Fractal TO Fractal, since INT64)")?;
-    conn.query("CREATE REL TABLE FractalParent(FROM Fractal TO Fractal, since INT64)")?;
     Ok(())
 }
 
@@ -104,12 +72,37 @@ fn is_table_already_exists_error(error: &DataError) -> bool {
     }
 }
 
+fn create_tables_and_relations(conn: &Connection) -> Result<(), DataError> {
+    conn.query(
+        "CREATE NODE TABLE Fractal (
+            id UUID,
+            name STRING,
+            createdAt TIMESTAMP,
+            updatedAt TIMESTAMP,
+            PRIMARY KEY (id)
+        )",
+    )?;
+
+    conn.query("CREATE REL TABLE FractalParent(FROM Fractal TO Fractal)")?;
+
+    let _root = create_fractal(&conn, "Root", None)?;
+
+    Ok(())
+}
+
 pub fn create_fractal(
-    db: &Database,
+    conn: &Connection,
     name: &str,
     parent_id: Option<&Uuid>,
 ) -> Result<Fractal, DataError> {
-    let conn = create_connection(db)?;
+    let fractal = get_fractal_by_name(&conn, name);
+
+    if fractal.is_ok() {
+        return Err(DataError::InvalidData(
+            "Fractal with this name is already exists".to_string(),
+        ));
+    }
+
     let query = "
         CREATE (f:Fractal {
             id: $uuid,
@@ -171,8 +164,7 @@ fn add_parent_relation(
     Ok(())
 }
 
-pub fn get_fractal_by_name(db: &Database, name: &str) -> Result<Fractal, DataError> {
-    let conn = create_connection(db)?;
+pub fn get_fractal_by_name(conn: &Connection, name: &str) -> Result<Fractal, DataError> {
     let query = "
         MATCH (f:Fractal {name: $name})
         RETURN f.id, f.name, f.createdAt, f.updatedAt
@@ -194,7 +186,7 @@ pub fn get_fractal_by_name(db: &Database, name: &str) -> Result<Fractal, DataErr
 pub fn get_fractal_children(db: &Database, id: &Uuid) -> Result<Vec<Fractal>, DataError> {
     let conn = create_connection(db)?;
     let query = "
-        MATCH (parent:Fractal {id: $id})<-[:FractalParent]-(child:Fractal)
+        MATCH (parent:Fractal {id: $id})-[:FractalParent]-(child:Fractal)
         RETURN child.id, child.name, child.createdAt, child.updatedAt
         ORDER BY child.name
     ";

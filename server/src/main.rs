@@ -1,6 +1,6 @@
 use server::data::{
-    create_connection, create_db, create_fractal, get_fractal_by_name, get_fractal_children,
-    init_database, DataError,
+    create_connection, create_db, get_fractal_by_name, get_fractal_children, init_database,
+    DataError,
 };
 use server::run;
 

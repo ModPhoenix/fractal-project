@@ -148,8 +148,8 @@ pub fn get_fractal_by_name(conn: &Connection, name: &str) -> Result<Fractal, Dat
     let params = vec![("name", Value::String(name.to_string()))];
     let mut result = conn.execute(&mut stmt, params)?;
 
-    dbg!("{:?}", result.get_compiling_time());
-    dbg!("{:?}", result.get_execution_time());
+    dbg!("get fractal by name {:?}", result.get_compiling_time());
+    dbg!("get fractal by name {:?}", result.get_execution_time());
 
     if let Some(row) = result.next() {
         row_to_fractal(&row)
@@ -327,7 +327,7 @@ fn row_to_fractal(row: &[Value]) -> Result<Fractal, DataError> {
 //     })
 // }
 
-fn get_uuid(row: &HashMap<String, Value>, key: &str) -> Result<Uuid, DataError> {
+fn _get_uuid(row: &HashMap<String, Value>, key: &str) -> Result<Uuid, DataError> {
     match row.get(key) {
         Some(Value::UUID(uuid)) => Ok(*uuid),
         _ => Err(DataError::InvalidData(format!(
@@ -337,7 +337,7 @@ fn get_uuid(row: &HashMap<String, Value>, key: &str) -> Result<Uuid, DataError> 
     }
 }
 
-fn get_string(row: &HashMap<String, Value>, key: &str) -> Result<String, DataError> {
+fn _get_string(row: &HashMap<String, Value>, key: &str) -> Result<String, DataError> {
     match row.get(key) {
         Some(Value::String(s)) => Ok(s.clone()),
         _ => Err(DataError::InvalidData(format!(
@@ -347,7 +347,7 @@ fn get_string(row: &HashMap<String, Value>, key: &str) -> Result<String, DataErr
     }
 }
 
-fn get_timestamp(
+fn _get_timestamp(
     row: &HashMap<String, Value>,
     key: &str,
 ) -> Result<chrono::DateTime<chrono::Utc>, DataError> {

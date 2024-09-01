@@ -4,18 +4,18 @@ use std::collections::HashMap;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-// Custom error type
 #[derive(Debug, thiserror::Error)]
 pub enum DataError {
     #[error("Database error: {0}")]
     Database(#[from] KuzuError),
+    #[error("Fractal with name '{0}' already exists")]
+    FractalAlreadyExists(String),
     #[error("Fractal not found: {0}")]
     FractalNotFound(String),
     #[error("Invalid data: {0}")]
     InvalidData(String),
 }
 
-// Fractal struct
 #[derive(Debug, Clone)]
 pub struct Fractal {
     pub id: Uuid,
@@ -24,7 +24,6 @@ pub struct Fractal {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-// Description struct
 #[derive(Debug, Clone)]
 pub struct Description {
     pub id: Uuid,
@@ -47,46 +46,30 @@ pub fn create_connection(db: &Database) -> Result<Connection, DataError> {
 pub fn init_database(conn: &Connection) -> Result<(), DataError> {
     println!("Initializing database...");
 
-    match create_tables_and_relations(conn) {
-        Ok(_) => println!("Tables and relations created."),
-        Err(e) => {
-            if is_table_already_exists_error(&e) {
-                println!("Tables and relations already exist.");
-            } else {
-                return Err(e);
-            }
+    conn.query(
+        "CREATE NODE TABLE IF NOT EXISTS Fractal (
+                id UUID,
+                name STRING,
+                createdAt TIMESTAMP,
+                updatedAt TIMESTAMP,
+                PRIMARY KEY (id)
+            )",
+    )?;
+
+    conn.query("CREATE REL TABLE IF NOT EXISTS FractalParent(FROM Fractal TO Fractal)")?;
+
+    let root_fractal = create_fractal(&conn, "Root", None);
+
+    match root_fractal {
+        Ok(_) => {
+            println!("Root fractal created.");
+        }
+        Err(_) => {
+            println!("Root fractal already exists.");
         }
     }
 
     println!("Database initialization completed.");
-    Ok(())
-}
-
-fn is_table_already_exists_error(error: &DataError) -> bool {
-    if let DataError::Database(kuzu_error) = error {
-        // Check if the error message contains a specific string indicating the table already exists
-        // You may need to adjust this based on the exact error message Kuzu returns
-        kuzu_error.to_string().contains("already exists")
-    } else {
-        false
-    }
-}
-
-fn create_tables_and_relations(conn: &Connection) -> Result<(), DataError> {
-    conn.query(
-        "CREATE NODE TABLE Fractal (
-            id UUID,
-            name STRING,
-            createdAt TIMESTAMP,
-            updatedAt TIMESTAMP,
-            PRIMARY KEY (id)
-        )",
-    )?;
-
-    conn.query("CREATE REL TABLE FractalParent(FROM Fractal TO Fractal)")?;
-
-    let _root = create_fractal(&conn, "Root", None)?;
-
     Ok(())
 }
 
@@ -95,12 +78,8 @@ pub fn create_fractal(
     name: &str,
     parent_id: Option<&Uuid>,
 ) -> Result<Fractal, DataError> {
-    let fractal = get_fractal_by_name(&conn, name);
-
-    if fractal.is_ok() {
-        return Err(DataError::InvalidData(
-            "Fractal with this name is already exists".to_string(),
-        ));
+    if let Ok(_) = get_fractal_by_name(conn, name) {
+        return Err(DataError::FractalAlreadyExists(name.to_string()));
     }
 
     let query = "
@@ -147,7 +126,7 @@ fn add_parent_relation(
 ) -> Result<(), DataError> {
     let query = "
         MATCH (child:Fractal {id: $child_id}), (parent:Fractal {id: $parent_id})
-        CREATE (child)-[:FractalParent {since: $since}]->(parent)
+        CREATE (child)-[:FractalParent]->(parent)
     ";
     let mut stmt = conn.prepare(query)?;
     conn.execute(
@@ -155,10 +134,6 @@ fn add_parent_relation(
         vec![
             ("child_id", Value::UUID(*child_id)),
             ("parent_id", Value::UUID(*parent_id)),
-            (
-                "since",
-                Value::Int64(OffsetDateTime::now_utc().unix_timestamp()),
-            ),
         ],
     )?;
     Ok(())

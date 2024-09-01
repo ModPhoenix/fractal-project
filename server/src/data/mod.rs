@@ -61,7 +61,8 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
     let root_fractal = create_fractal(&conn, "Root", None);
 
     match root_fractal {
-        Ok(_) => {
+        Ok(root) => {
+            let _ = create_fractal(&conn, "Child1", Some(&root.id));
             println!("Root fractal created.");
         }
         Err(_) => {

@@ -5,7 +5,7 @@ authors = ["Bohdan Ivanchenko <ivanchenko.b@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-async-graphql = "7.0.8"
+async-graphql = { version = "7.0.8", features = ["uuid", "apollo_tracing"] }
 async-graphql-axum = "7.0.8"
 axum = "0.7.5"
 chrono = "0.4.38"
@@ -27,4 +27,4 @@ features = [
 ]
 
 [dev-dependencies]
-reqwest = "0.12.7"
+reqwest = { version = "0.12.7", features = ["json"] }

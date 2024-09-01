@@ -76,6 +76,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bytes",
+ "chrono",
  "fast_chemail",
  "fnv",
  "futures-timer",
@@ -95,6 +96,7 @@ dependencies = [
  "static_assertions_next",
  "tempfile",
  "thiserror",
+ "uuid",
 ]
 
 [[package]]
@@ -2188,6 +2190,7 @@ checksum = "81dfa00651efa65069b0b6b651f4aaa31ba9e3c3ce0137aaad053604ee7e0314"
 dependencies = [
  "getrandom",
  "rand",
+ "serde",
  "uuid-macro-internal",
 ]
 

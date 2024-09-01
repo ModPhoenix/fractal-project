@@ -1,7 +1,12 @@
+use kuzu::Database;
+use std::sync::Arc;
+
 pub mod data;
 pub mod graphql;
 
-use async_graphql::{http::GraphiQLSource, EmptyMutation, EmptySubscription, Schema};
+use async_graphql::{
+    extensions::ApolloTracing, http::GraphiQLSource, EmptyMutation, EmptySubscription, Schema,
+};
 use async_graphql_axum::GraphQL;
 use axum::{
     http::StatusCode,
@@ -12,24 +17,21 @@ use axum::{
 };
 use graphql::QueryRoot;
 use tokio::net::TcpListener;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub type Server = Serve<Router<()>, Router<()>>;
 
-pub fn run(listener: TcpListener) -> Result<Server, std::io::Error> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+pub fn run(listener: TcpListener, db: Database) -> Result<Server, std::io::Error> {
+    let state = Arc::new(db);
 
-    let schema = Schema::build(QueryRoot::default(), EmptyMutation, EmptySubscription).finish();
+    let schema = Schema::build(QueryRoot::default(), EmptyMutation, EmptySubscription)
+        .data(state.clone())
+        .extension(ApolloTracing)
+        .finish();
 
     let app = Router::new()
         .route("/", get(graphiql).post_service(GraphQL::new(schema)))
-        .route("/health_check", get(health_check));
+        .route("/health_check", get(health_check))
+        .with_state(state);
 
     tracing::debug!(
         "GraphiQL IDE: http://{}:{}",

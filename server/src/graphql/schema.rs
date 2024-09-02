@@ -1,3 +1,5 @@
+use super::errors::GraphQLError;
+
 use std::sync::Arc;
 
 use crate::data::{self, Fractal};
@@ -14,12 +16,15 @@ pub struct FractalQueries;
 impl FractalQueries {
     async fn fractal(&self, ctx: &Context<'_>, name: String) -> Result<FractalGraphQL> {
         let db = ctx.data::<Arc<Database>>()?;
-        let conn = data::create_connection(&db)?;
-        let fractal = data::get_fractal_by_name(&conn, &name)
-            .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+        let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
+        let fractal = data::get_fractal_by_name(&conn, &name).map_err(|e| match e {
+            data::DataError::FractalNotFound(_) => {
+                GraphQLError::NotFound(format!("Fractal '{}' not found", name))
+            }
+            _ => GraphQLError::from(e),
+        })?;
 
-        let children = data::get_fractal_children(&db, &fractal.id)
-            .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+        let children = data::get_fractal_children(&db, &fractal.id).map_err(GraphQLError::from)?;
 
         Ok(FractalGraphQL {
             id: fractal.id,

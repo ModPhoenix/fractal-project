@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::data::{self, Fractal};
 use async_graphql::{
-    Context, EmptySubscription, InputObject, MergedObject, Object, Result, Schema,
+    Context, EmptySubscription, InputObject, MergedObject, Object, Result, Schema, SimpleObject,
 };
 use kuzu::Database;
 use uuid::Uuid;
@@ -68,7 +68,7 @@ impl FractalQueries {
     }
 }
 
-#[derive(async_graphql::SimpleObject)]
+#[derive(SimpleObject)]
 struct FractalGraphQL {
     id: Uuid,
     name: String,

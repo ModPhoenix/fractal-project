@@ -112,3 +112,77 @@ async fn test_create_fractal_mutation() {
     let children = created_fractal["children"].as_array().unwrap();
     assert!(children.is_empty());
 }
+
+#[tokio::test]
+async fn test_fractal_name_uniqueness() {
+    // Arrange
+    let address = spawn_app().await;
+    let client = Client::new();
+
+    // GraphQL mutation
+    let mutation = r#"
+        mutation ($input: CreateFractalInput!) {
+            createFractal(input: $input) {
+                id
+                name
+            }
+        }
+    "#;
+
+    let variables = json!({
+        "input": {
+            "name": "Unique Fractal",
+            "parentId": null
+        }
+    });
+
+    // Act - Create first fractal
+    let response = client
+        .post(&format!("{}", &address))
+        .header("Content-Type", "application/json")
+        .body(
+            json!({
+                "query": mutation,
+                "variables": variables,
+            })
+            .to_string(),
+        )
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert - First creation should succeed
+    assert!(response.status().is_success());
+    let body = response.json::<serde_json::Value>().await.unwrap();
+    assert!(body.get("data").is_some());
+    let created_fractal = body["data"]["createFractal"].as_object().unwrap();
+    assert_eq!(created_fractal["name"], "Unique Fractal");
+
+    // Act - Attempt to create second fractal with the same name
+    let response = client
+        .post(&format!("{}", &address))
+        .header("Content-Type", "application/json")
+        .body(
+            json!({
+                "query": mutation,
+                "variables": variables,
+            })
+            .to_string(),
+        )
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert - Second creation should fail
+    assert!(response.status().is_success()); // GraphQL always returns 200 OK
+    let body = response.json::<serde_json::Value>().await.unwrap();
+
+    // Check for the presence of errors
+    assert!(body.get("errors").is_some());
+    let errors = body["errors"].as_array().unwrap();
+    assert!(!errors.is_empty());
+
+    // Check the error message
+    let error_message = errors[0]["message"].as_str().unwrap();
+    assert!(error_message.contains("already exists"));
+}

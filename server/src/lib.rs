@@ -4,9 +4,7 @@ use std::sync::Arc;
 pub mod data;
 pub mod graphql;
 
-use async_graphql::{
-    extensions::ApolloTracing, http::GraphiQLSource, EmptyMutation, EmptySubscription, Schema,
-};
+use async_graphql::{extensions::ApolloTracing, http::GraphiQLSource, EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
 use axum::{
     http::StatusCode,
@@ -15,7 +13,7 @@ use axum::{
     serve::Serve,
     Router,
 };
-use graphql::QueryRoot;
+use graphql::{MutationRoot, QueryRoot};
 use tokio::net::TcpListener;
 
 pub type Server = Serve<Router<()>, Router<()>>;
@@ -23,10 +21,14 @@ pub type Server = Serve<Router<()>, Router<()>>;
 pub fn run(listener: TcpListener, db: Database) -> Result<Server, std::io::Error> {
     let state = Arc::new(db);
 
-    let schema = Schema::build(QueryRoot::default(), EmptyMutation, EmptySubscription)
-        .data(state.clone())
-        .extension(ApolloTracing)
-        .finish();
+    let schema = Schema::build(
+        QueryRoot::default(),
+        MutationRoot::default(),
+        EmptySubscription,
+    )
+    .data(state.clone())
+    .extension(ApolloTracing)
+    .finish();
 
     let app = Router::new()
         .route("/", get(graphiql).post_service(GraphQL::new(schema)))

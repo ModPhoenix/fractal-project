@@ -1,13 +1,47 @@
 use super::errors::GraphQLError;
-
 use std::sync::Arc;
 
 use crate::data::{self, Fractal};
 use async_graphql::{
-    Context, EmptyMutation, EmptySubscription, MergedObject, Object, Result, Schema,
+    Context, EmptySubscription, InputObject, MergedObject, Object, Result, Schema,
 };
 use kuzu::Database;
 use uuid::Uuid;
+
+#[derive(Default)]
+pub struct FractalMutations;
+
+#[derive(InputObject)]
+struct CreateFractalInput {
+    name: String,
+    parent_id: Option<Uuid>,
+}
+
+#[Object]
+impl FractalMutations {
+    async fn create_fractal(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateFractalInput,
+    ) -> Result<FractalGraphQL> {
+        let db = ctx.data::<Arc<Database>>()?;
+        let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
+
+        let fractal = data::create_fractal(&conn, &input.name, input.parent_id.as_ref()).map_err(
+            |e| match e {
+                data::DataError::FractalAlreadyExists(_) => {
+                    GraphQLError::InvalidInput(format!("Fractal '{}' already exists", input.name))
+                }
+                _ => GraphQLError::from(e),
+            },
+        )?;
+
+        Ok(FractalGraphQL::from(fractal))
+    }
+}
+
+#[derive(MergedObject, Default)]
+pub struct MutationRoot(FractalMutations);
 
 #[derive(Default)]
 pub struct FractalQueries;
@@ -54,4 +88,4 @@ impl From<Fractal> for FractalGraphQL {
 #[derive(MergedObject, Default)]
 pub struct QueryRoot(FractalQueries);
 
-pub type FractalSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
+pub type FractalSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;

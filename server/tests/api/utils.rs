@@ -1,4 +1,5 @@
-use server::data::{create_db, init_database};
+use kuzu::{Database, SystemConfig};
+use server::data::init_database;
 
 pub async fn spawn_app() -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -9,7 +10,7 @@ pub async fn spawn_app() -> String {
         .expect("Failed to get local address.")
         .port();
 
-    let db = create_db("./test_db").expect("Failed to create database");
+    let db = Database::new(":memory:", SystemConfig::default()).expect("Failed to create database");
     // Create a new scope for database initialization
     {
         let conn = server::data::create_connection(&db).expect("Failed to create connection.");

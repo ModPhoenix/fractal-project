@@ -56,7 +56,17 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
             )",
     )?;
 
-    conn.query("CREATE REL TABLE IF NOT EXISTS FractalParent(FROM Fractal TO Fractal)")?;
+    conn.query(
+        "CREATE NODE TABLE IF NOT EXISTS Knowledge (
+                    id UUID,
+                    content STRING,
+                    createdAt TIMESTAMP,
+                    updatedAt TIMESTAMP,
+                    PRIMARY KEY (id)
+                )",
+    )?;
+
+    conn.query("CREATE REL TABLE IF NOT EXISTS FractalEdge(FROM Fractal TO Fractal)")?;
 
     let root_fractal = create_fractal(&conn, "Root", None);
 
@@ -109,7 +119,7 @@ pub fn create_fractal(
         let fractal = row_to_fractal(&row)?;
 
         if let Some(parent_id) = parent_id {
-            add_parent_relation(&conn, &fractal.id, parent_id)?;
+            add_fractal_edge(&conn, &fractal.id, parent_id)?;
         }
 
         Ok(fractal)
@@ -120,14 +130,10 @@ pub fn create_fractal(
     }
 }
 
-fn add_parent_relation(
-    conn: &Connection,
-    child_id: &Uuid,
-    parent_id: &Uuid,
-) -> Result<(), DataError> {
+fn add_fractal_edge(conn: &Connection, child_id: &Uuid, parent_id: &Uuid) -> Result<(), DataError> {
     let query = "
         MATCH (child:Fractal {id: $child_id}), (parent:Fractal {id: $parent_id})
-        CREATE (child)-[:FractalParent]->(parent)
+        CREATE (child)-[:FractalEdge]->(parent)
     ";
     let mut stmt = conn.prepare(query)?;
     conn.execute(
@@ -162,7 +168,7 @@ pub fn get_fractal_by_name(conn: &Connection, name: &str) -> Result<Fractal, Dat
 pub fn get_fractal_children(db: &Database, id: &Uuid) -> Result<Vec<Fractal>, DataError> {
     let conn = create_connection(db)?;
     let query = "
-        MATCH (parent:Fractal {id: $id})-[:FractalParent]-(child:Fractal)
+        MATCH (parent:Fractal {id: $id})-[:FractalEdge]-(child:Fractal)
         RETURN child.id, child.name, child.createdAt, child.updatedAt
         ORDER BY child.name
     ";
@@ -177,24 +183,6 @@ pub fn get_fractal_children(db: &Database, id: &Uuid) -> Result<Vec<Fractal>, Da
 
     Ok(children)
 }
-
-// pub async fn get_fractal_children(
-//     conn: &DbConnection,
-//     parent_id: &UUID,
-// ) -> Result<Vec<Fractal>, DataError> {
-//     let query = "
-//         SELECT f.id, f.name, f.createdAt, f.updatedAt
-//         FROM Fractal f
-//         JOIN FractalParent fp ON f.id = fp.FROM
-//         WHERE fp.TO = $1
-//         ORDER BY fp.order
-//     ";
-//     let mut stmt = conn.prepare().await?;
-//     stmt.bind_parameters(&[Value::UUID(*parent_id)])?;
-//     let result = execute_query(conn, &mut stmt).await?;
-
-//     result.into_iter().map(|row| row_to_fractal(&row)).collect()
-// }
 
 // pub async fn get_fractal_parents(
 //     conn: &DbConnection,
@@ -262,23 +250,6 @@ pub fn get_fractal_children(db: &Database, id: &Uuid) -> Result<Vec<Fractal>, Da
 //     stmt.bind_parameters(&[Value::UUID(*child_id), Value::UUID(*parent_id)])?;
 //     execute_query(conn, &mut stmt).await?;
 //     Ok(())
-// }
-
-// async fn prepare_statement(
-//     conn: &DbConnection,
-//     query: &str,
-// ) -> Result<PreparedStatement, DataError> {
-//     let conn = conn.lock().await;
-//     Ok(conn.prepare(query)?)
-// }
-
-// async fn execute_query(
-//     conn: &DbConnection,
-//     stmt: &mut PreparedStatement,
-// ) -> Result<Vec<HashMap<String, Value>>, DataError> {
-//     let conn = conn.lock().await;
-//     let result = conn.execute(stmt)?;
-//     Ok(result.get_rows()?)
 // }
 
 fn row_to_fractal(row: &[Value]) -> Result<Fractal, DataError> {

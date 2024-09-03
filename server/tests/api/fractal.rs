@@ -50,7 +50,7 @@ async fn test_fractal_query() {
 
     // Check if children are present
     let children = fractal["children"].as_array().unwrap();
-    assert!(!children.is_empty());
+    assert_eq!(children.len(), 1);
 }
 
 #[tokio::test]
@@ -61,16 +61,16 @@ async fn test_create_fractal_mutation() {
 
     // GraphQL mutation
     let mutation = r#"
-    mutation ($input: CreateFractalInput!) {
-        createFractal(input: $input) {
-            id
-            name
-            children {
+        mutation ($input: CreateFractalInput!) {
+            createFractal(input: $input) {
                 id
                 name
+                children {
+                    id
+                    name
+                }
             }
         }
-    }
     "#;
 
     let variables = json!({

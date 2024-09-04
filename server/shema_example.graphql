@@ -1,0 +1,51 @@
+schema {
+    query: QueryRoot
+    mutation: MutationRoot
+}
+
+scalar DateTime
+scalar UUID
+
+type QueryRoot {
+    fractal(name: String!): Fractal
+    root: Fractal!
+    knowledge(fractalName: String!, context: [UUID!]!): Knowledge
+}
+
+type MutationRoot {
+    createFractal(input: CreateFractalInput!): Fractal!
+    deleteFractal(id: UUID!): Boolean!
+    addKnowledge(input: AddKnowledgeInput!): Knowledge!
+}
+
+type Fractal {
+    id: UUID!
+    # name is unique
+    name: String!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    parents: [Fractal!]!
+    children: [Fractal!]!
+    contexts: [Fractal!]!
+    knowledges: [Knowledge!]!
+    knowledge(context: [UUID!]!): Knowledge
+}
+
+type Knowledge {
+    id: UUID!
+    content: String!
+    fractal: Fractal!
+    context: [Fractal!]!
+}
+
+input CreateFractalInput {
+    name: String!
+    parentIds: [UUID!]
+    contextIds: [UUID!]
+}
+
+input AddKnowledgeInput {
+    fractalId: UUID!
+    content: String!
+    context: [UUID!]!
+}

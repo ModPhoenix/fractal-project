@@ -1,5 +1,4 @@
 # Ignore the target directory
 target
 demo_db
-test_db
 .env

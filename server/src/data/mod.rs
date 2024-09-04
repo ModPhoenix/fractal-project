@@ -48,22 +48,22 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
 
     conn.query(
         "CREATE NODE TABLE IF NOT EXISTS Fractal (
-                id UUID,
-                name STRING,
-                createdAt TIMESTAMP,
-                updatedAt TIMESTAMP,
-                PRIMARY KEY (id)
-            )",
+            id UUID,
+            name STRING,
+            createdAt TIMESTAMP,
+            updatedAt TIMESTAMP,
+            PRIMARY KEY (id)
+        )",
     )?;
 
     conn.query(
         "CREATE NODE TABLE IF NOT EXISTS Knowledge (
-                    id UUID,
-                    content STRING,
-                    createdAt TIMESTAMP,
-                    updatedAt TIMESTAMP,
-                    PRIMARY KEY (id)
-                )",
+            id UUID,
+            content STRING,
+            createdAt TIMESTAMP,
+            updatedAt TIMESTAMP,
+            PRIMARY KEY (id)
+        )",
     )?;
 
     conn.query("CREATE REL TABLE IF NOT EXISTS FractalEdge(FROM Fractal TO Fractal)")?;

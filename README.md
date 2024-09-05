@@ -15,3 +15,17 @@ Key features:
 - Integration with educational institutions
 
 Fractal has applications for professionals, businesses, recruiters, and academic institutions. Join us in building the future of knowledge management and skills assessment!
+
+## WIP Cypher schema representation
+
+```
+[Fractal]
+   |
+   |-- HAS_CHILD --> [Fractal]
+   |
+   |-- PROVIDES_CONTEXT_FOR --> [Fractal]
+   |
+   |-- HAS_KNOWLEDGE --> [Knowledge]
+                             |
+                             |-- IN_CONTEXT --> [Fractal]
+```

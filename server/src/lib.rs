@@ -4,7 +4,7 @@ use std::sync::Arc;
 pub mod data;
 pub mod graphql;
 
-use async_graphql::{extensions::ApolloTracing, http::GraphiQLSource, EmptySubscription, Schema};
+use async_graphql::{http::GraphiQLSource, EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
 use axum::{
     http::StatusCode,
@@ -27,7 +27,6 @@ pub fn run(listener: TcpListener, db: Database) -> Result<Server, std::io::Error
         EmptySubscription,
     )
     .data(state.clone())
-    .extension(ApolloTracing)
     .finish();
 
     let app = Router::new()

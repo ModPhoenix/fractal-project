@@ -29,3 +29,35 @@ Fractal has applications for professionals, businesses, recruiters, and academic
                              |
                              |-- IN_CONTEXT --> [Fractal]
 ```
+
+Example schema in Cypher:
+
+```cypher
+// Define constraints
+CREATE CONSTRAINT ON (f:Fractal) ASSERT f.id IS UNIQUE;
+CREATE CONSTRAINT ON (f:Fractal) ASSERT f.name IS UNIQUE;
+CREATE CONSTRAINT ON (k:Knowledge) ASSERT k.id IS UNIQUE;
+
+// Define indexes
+CREATE INDEX ON :Fractal(name);
+CREATE INDEX ON :Knowledge(id);
+
+// Nodes
+(:Fractal {
+  id: UUID,
+  name: String,
+  createdAt: DateTime,
+  updatedAt: DateTime
+})
+
+(:Knowledge {
+  id: UUID,
+  content: String
+})
+
+// Relationship structure:
+(:Fractal)-[:HAS_CHILD]->(:Fractal)
+(:Fractal)-[:PROVIDES_CONTEXT_FOR]->(:Fractal)
+(:Fractal)-[:HAS_KNOWLEDGE]->(:Knowledge)
+(:Knowledge)-[:IN_CONTEXT]->(:Fractal)
+```

@@ -27,14 +27,14 @@ impl FractalMutations {
         let db = ctx.data::<Arc<Database>>()?;
         let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
 
-        let fractal = data::create_fractal(&conn, &input.name, input.parent_id.as_ref()).map_err(
-            |e| match e {
+        let parent_ids = input.parent_id.map(|id| vec![id]).unwrap_or_default();
+        let fractal =
+            data::create_fractal(&conn, &input.name, &parent_ids, &[]).map_err(|e| match e {
                 data::DataError::FractalAlreadyExists(_) => {
                     GraphQLError::InvalidInput(format!("Fractal '{}' already exists", input.name))
                 }
                 _ => GraphQLError::from(e),
-            },
-        )?;
+            })?;
 
         Ok(FractalGraphQL::from(fractal))
     }
@@ -58,7 +58,8 @@ impl FractalQueries {
             _ => GraphQLError::from(e),
         })?;
 
-        let children = data::get_fractal_children(&db, &fractal.id).map_err(GraphQLError::from)?;
+        let children =
+            data::get_fractal_children(&conn, &fractal.id).map_err(GraphQLError::from)?;
 
         Ok(FractalGraphQL {
             id: fractal.id,

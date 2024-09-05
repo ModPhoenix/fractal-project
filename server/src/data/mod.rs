@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
-use kuzu::{Connection, Database, Error as KuzuError, SystemConfig, Value};
-use std::collections::HashMap;
+use kuzu::{Connection, Database, Error as KuzuError, LogicalType, SystemConfig, Value};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -25,10 +24,14 @@ pub struct Fractal {
 }
 
 #[derive(Debug, Clone)]
-pub struct Description {
+pub struct Knowledge {
     pub id: Uuid,
     pub content: String,
-    pub context_path: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Context {
+    pub fractal_id: Uuid,
 }
 
 pub fn create_db(db_path: &str) -> Result<Database, DataError> {
@@ -46,6 +49,7 @@ pub fn create_connection(db: &Database) -> Result<Connection, DataError> {
 pub fn init_database(conn: &Connection) -> Result<(), DataError> {
     println!("Initializing database...");
 
+    // Create node tables
     conn.query(
         "CREATE NODE TABLE IF NOT EXISTS Fractal (
             id UUID,
@@ -66,13 +70,26 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
         )",
     )?;
 
-    conn.query("CREATE REL TABLE IF NOT EXISTS FractalEdge(FROM Fractal TO Fractal)")?;
+    // Create relationship tables
+    conn.query("CREATE REL TABLE IF NOT EXISTS HAS_CHILD(FROM Fractal TO Fractal)")?;
+    conn.query("CREATE REL TABLE IF NOT EXISTS HAS_CONTEXT(FROM Fractal TO Fractal)")?;
+    conn.query("CREATE REL TABLE IF NOT EXISTS HAS_KNOWLEDGE(FROM Fractal TO Knowledge)")?;
+    conn.query("CREATE REL TABLE IF NOT EXISTS IN_CONTEXT(FROM Knowledge TO Fractal)")?;
 
-    let root_fractal = create_fractal(&conn, "Root", None);
+    // Create constraints
+    // conn.query("CREATE CONSTRAINT ON (f:Fractal) ASSERT f.id IS UNIQUE")?;
+    // conn.query("CREATE CONSTRAINT ON (f:Fractal) ASSERT f.name IS UNIQUE")?;
+    // conn.query("CREATE CONSTRAINT ON (k:Knowledge) ASSERT k.id IS UNIQUE")?;
+
+    // Create indexes
+    // conn.query("CREATE INDEX ON :Fractal(name)")?;
+    // conn.query("CREATE INDEX ON :Knowledge(id)")?;
+
+    let root_fractal = create_fractal(&conn, "Root", &[], &[]);
 
     match root_fractal {
         Ok(root) => {
-            let _ = create_fractal(&conn, "Child1", Some(&root.id));
+            let _ = create_fractal(&conn, "Child1", &[root.id], &[root.id]);
             println!("Root fractal created.");
         }
         Err(_) => {
@@ -87,7 +104,8 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
 pub fn create_fractal(
     conn: &Connection,
     name: &str,
-    parent_id: Option<&Uuid>,
+    parent_ids: &[Uuid],
+    context_ids: &[Uuid],
 ) -> Result<Fractal, DataError> {
     if let Ok(_) = get_fractal_by_name(conn, name) {
         return Err(DataError::FractalAlreadyExists(name.to_string()));
@@ -118,8 +136,12 @@ pub fn create_fractal(
     if let Some(row) = result.into_iter().next() {
         let fractal = row_to_fractal(&row)?;
 
-        if let Some(parent_id) = parent_id {
-            add_fractal_edge(&conn, &fractal.id, parent_id)?;
+        for parent_id in parent_ids {
+            add_has_child_edge(conn, parent_id, &fractal.id)?;
+        }
+
+        for context_id in context_ids {
+            add_has_context_edge(conn, &fractal.id, context_id)?;
         }
 
         Ok(fractal)
@@ -130,17 +152,41 @@ pub fn create_fractal(
     }
 }
 
-fn add_fractal_edge(conn: &Connection, child_id: &Uuid, parent_id: &Uuid) -> Result<(), DataError> {
+fn add_has_child_edge(
+    conn: &Connection,
+    parent_id: &Uuid,
+    child_id: &Uuid,
+) -> Result<(), DataError> {
     let query = "
-        MATCH (child:Fractal {id: $child_id}), (parent:Fractal {id: $parent_id})
-        CREATE (child)-[:FractalEdge]->(parent)
+        MATCH (parent:Fractal {id: $parent_id}), (child:Fractal {id: $child_id})
+        CREATE (parent)-[:HAS_CHILD]->(child)
     ";
     let mut stmt = conn.prepare(query)?;
     conn.execute(
         &mut stmt,
         vec![
-            ("child_id", Value::UUID(*child_id)),
             ("parent_id", Value::UUID(*parent_id)),
+            ("child_id", Value::UUID(*child_id)),
+        ],
+    )?;
+    Ok(())
+}
+
+fn add_has_context_edge(
+    conn: &Connection,
+    fractal_id: &Uuid,
+    context_id: &Uuid,
+) -> Result<(), DataError> {
+    let query = "
+        MATCH (f:Fractal {id: $fractal_id}), (c:Fractal {id: $context_id})
+        CREATE (f)-[:HAS_CONTEXT]->(c)
+    ";
+    let mut stmt = conn.prepare(query)?;
+    conn.execute(
+        &mut stmt,
+        vec![
+            ("fractal_id", Value::UUID(*fractal_id)),
+            ("context_id", Value::UUID(*context_id)),
         ],
     )?;
     Ok(())
@@ -165,16 +211,29 @@ pub fn get_fractal_by_name(conn: &Connection, name: &str) -> Result<Fractal, Dat
     }
 }
 
-pub fn get_fractal_children(db: &Database, id: &Uuid) -> Result<Vec<Fractal>, DataError> {
-    let conn = create_connection(db)?;
+pub fn get_fractal_parents(conn: &Connection, id: &Uuid) -> Result<Vec<Fractal>, DataError> {
     let query = "
-        MATCH (parent:Fractal {id: $id})-[:FractalEdge]-(child:Fractal)
-        RETURN child.id, child.name, child.createdAt, child.updatedAt
-        ORDER BY child.name
+        MATCH (parent:Fractal)-[:HAS_CHILD]->(f:Fractal {id: $id})
+        RETURN parent.id, parent.name, parent.createdAt, parent.updatedAt
     ";
     let mut stmt = conn.prepare(query)?;
-    let params = vec![("id", Value::UUID(*id))];
-    let result = conn.execute(&mut stmt, params)?;
+    let result = conn.execute(&mut stmt, vec![("id", Value::UUID(*id))])?;
+
+    let mut parents = Vec::new();
+    for row in result {
+        parents.push(row_to_fractal(&row)?);
+    }
+
+    Ok(parents)
+}
+
+pub fn get_fractal_children(conn: &Connection, id: &Uuid) -> Result<Vec<Fractal>, DataError> {
+    let query = "
+        MATCH (f:Fractal {id: $id})-[:HAS_CHILD]->(child:Fractal)
+        RETURN child.id, child.name, child.createdAt, child.updatedAt
+    ";
+    let mut stmt = conn.prepare(query)?;
+    let result = conn.execute(&mut stmt, vec![("id", Value::UUID(*id))])?;
 
     let mut children = Vec::new();
     for row in result {
@@ -184,73 +243,76 @@ pub fn get_fractal_children(db: &Database, id: &Uuid) -> Result<Vec<Fractal>, Da
     Ok(children)
 }
 
-// pub async fn get_fractal_parents(
-//     conn: &DbConnection,
-//     child_id: &UUID,
-// ) -> Result<Vec<Fractal>, DataError> {
-//     let query = "
-//         SELECT f.id, f.name, f.createdAt, f.updatedAt
-//         FROM Fractal f
-//         JOIN FractalParent fp ON f.id = fp.TO
-//         WHERE fp.FROM = $1
-//     ";
-//     let mut stmt = prepare_statement(conn, query).await?;
-//     stmt.bind_parameters(&[Value::UUID(*child_id)])?;
-//     let result = execute_query(conn, &mut stmt).await?;
+pub fn get_fractal_contexts(conn: &Connection, id: &Uuid) -> Result<Vec<Fractal>, DataError> {
+    let query = "
+        MATCH (f:Fractal {id: $id})-[:HAS_CONTEXT]->(context:Fractal)
+        RETURN context.id, context.name, context.createdAt, context.updatedAt
+    ";
+    let mut stmt = conn.prepare(query)?;
+    let result = conn.execute(&mut stmt, vec![("id", Value::UUID(*id))])?;
 
-//     result.into_iter().map(|row| row_to_fractal(&row)).collect()
-// }
+    let mut contexts = Vec::new();
+    for row in result {
+        contexts.push(row_to_fractal(&row)?);
+    }
 
-// pub async fn get_description(
-//     conn: &DbConnection,
-//     fractal_id: &UUID,
-//     context_pattern: &[String],
-// ) -> Result<Description, DataError> {
-//     let query = "
-//         SELECT d.id, d.content, fd.contextPath
-//         FROM Fractal f
-//         JOIN FractalDescription fd ON f.id = fd.FROM
-//         JOIN Description d ON fd.TO = d.id
-//         WHERE f.id = $1 AND fd.contextPath[0:$2] = $3
-//         LIMIT 1
-//     ";
-//     let mut stmt = prepare_statement(conn, query).await?;
-//     stmt.bind_parameters(&[
-//         Value::UUID(*fractal_id),
-//         Value::Int64(context_pattern.len() as i64),
-//         Value::List(
-//             context_pattern
-//                 .iter()
-//                 .map(|s| Value::String(s.clone()))
-//                 .collect(),
-//         ),
-//     ])?;
-//     let result = execute_query(conn, &mut stmt).await?;
+    Ok(contexts)
+}
 
-//     if let Some(row) = result.into_iter().next() {
-//         row_to_description(&row)
-//     } else {
-//         Err(DataError::FractalNotFound(format!(
-//             "Description for fractal {} with given context not found",
-//             fractal_id
-//         )))
-//     }
-// }
+pub fn get_fractal_knowledge_with_context(
+    conn: &Connection,
+    fractal_name: &str,
+    context_ids: &[Uuid],
+) -> Result<Vec<Knowledge>, DataError> {
+    let query = "
+        MATCH (f:Fractal {name: $fractal_name})-[:HAS_KNOWLEDGE]->(k:Knowledge)
+        WHERE ALL(contextId IN $context_ids WHERE (k)-[:IN_CONTEXT]->(:Fractal {id: contextId}))
+        RETURN k.id, k.content
+    ";
+    let mut stmt = conn.prepare(query)?;
+    let result = conn.execute(
+        &mut stmt,
+        vec![
+            ("fractal_name", Value::String(fractal_name.to_string())),
+            (
+                "context_ids",
+                Value::List(
+                    LogicalType::List {
+                        child_type: Box::new(LogicalType::UUID),
+                    },
+                    context_ids
+                        .iter()
+                        .map(|&id| Value::UUID(id))
+                        .collect::<Vec<_>>(),
+                ),
+            ),
+        ],
+    )?;
 
-// async fn add_parent_relation(
-//     conn: &DbConnection,
-//     child_id: &UUID,
-//     parent_id: &UUID,
-// ) -> Result<(), DataError> {
-//     let query = "
-//         INSERT INTO FractalParent (FROM, TO, order)
-//         VALUES ($1, $2, (SELECT COALESCE(MAX(order), 0) + 1 FROM FractalParent WHERE TO = $2))
-//     ";
-//     let mut stmt = prepare_statement(conn, query).await?;
-//     stmt.bind_parameters(&[Value::UUID(*child_id), Value::UUID(*parent_id)])?;
-//     execute_query(conn, &mut stmt).await?;
-//     Ok(())
-// }
+    let mut knowledge = Vec::new();
+    for row in result {
+        knowledge.push(row_to_knowledge(&row)?);
+    }
+
+    Ok(knowledge)
+}
+
+fn row_to_knowledge(row: &[Value]) -> Result<Knowledge, DataError> {
+    Ok(Knowledge {
+        id: match &row[0] {
+            Value::UUID(uuid) => *uuid,
+            _ => return Err(DataError::InvalidData("Invalid UUID for id".to_string())),
+        },
+        content: match &row[1] {
+            Value::String(s) => s.clone(),
+            _ => {
+                return Err(DataError::InvalidData(
+                    "Invalid String for content".to_string(),
+                ))
+            }
+        },
+    })
+}
 
 fn row_to_fractal(row: &[Value]) -> Result<Fractal, DataError> {
     Ok(Fractal {
@@ -290,64 +352,3 @@ fn row_to_fractal(row: &[Value]) -> Result<Fractal, DataError> {
         },
     })
 }
-
-// fn row_to_description(row: &HashMap<String, Value>) -> Result<Description, DataError> {
-//     Ok(Description {
-//         id: get_uuid(row, "id")?,
-//         content: get_string(row, "content")?,
-//         context_path: get_uuid_list(row, "contextPath")?,
-//     })
-// }
-
-fn _get_uuid(row: &HashMap<String, Value>, key: &str) -> Result<Uuid, DataError> {
-    match row.get(key) {
-        Some(Value::UUID(uuid)) => Ok(*uuid),
-        _ => Err(DataError::InvalidData(format!(
-            "Invalid UUID for key: {}",
-            key
-        ))),
-    }
-}
-
-fn _get_string(row: &HashMap<String, Value>, key: &str) -> Result<String, DataError> {
-    match row.get(key) {
-        Some(Value::String(s)) => Ok(s.clone()),
-        _ => Err(DataError::InvalidData(format!(
-            "Invalid String for key: {}",
-            key
-        ))),
-    }
-}
-
-fn _get_timestamp(
-    row: &HashMap<String, Value>,
-    key: &str,
-) -> Result<chrono::DateTime<chrono::Utc>, DataError> {
-    match row.get(key) {
-        Some(Value::Timestamp(ts)) => DateTime::<Utc>::from_timestamp(ts.unix_timestamp(), 0)
-            .ok_or_else(|| DataError::InvalidData(format!("Invalid Timestamp for key: {}", key))),
-        _ => Err(DataError::InvalidData(format!(
-            "Invalid Timestamp for key: {}",
-            key
-        ))),
-    }
-}
-
-// fn get_uuid_list(row: &HashMap<String, Value>, key: &str) -> Result<Vec<Uuid>, DataError> {
-//     match row.get(key) {
-//         Some(Value::List(list)) => list
-//             .iter()
-//             .map(|v| {
-//                 if let Value::UUID(uuid) = v {
-//                     Ok(*uuid)
-//                 } else {
-//                     Err(DataError::InvalidData("Invalid UUID in list".to_string()))
-//                 }
-//             })
-//             .collect(),
-//         _ => Err(DataError::InvalidData(format!(
-//             "Invalid UUID list for key: {}",
-//             key
-//         ))),
-//     }
-// }

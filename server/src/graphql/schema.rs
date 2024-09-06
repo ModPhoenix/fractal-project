@@ -58,8 +58,8 @@ impl FractalQueries {
             _ => GraphQLError::from(e),
         })?;
 
-        let children =
-            data::get_fractal_children(&conn, &fractal.id).map_err(GraphQLError::from)?;
+        let children = data::get_fractal_relations(&conn, &fractal.id, "children")
+            .map_err(GraphQLError::from)?;
 
         Ok(FractalGraphQL {
             id: fractal.id,

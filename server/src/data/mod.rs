@@ -194,15 +194,16 @@ pub fn get_fractal_relations(
     relation: &str,
 ) -> Result<Vec<Fractal>, DataError> {
     let query = match relation {
-        "parents" => "MATCH (parent:Fractal)-[:HAS_CHILD]->(f:Fractal {id: $id})",
-        "children" => "MATCH (f:Fractal {id: $id})-[:HAS_CHILD]->(child:Fractal)",
-        "contexts" => "MATCH (f:Fractal {id: $id})-[:HAS_CONTEXT]->(context:Fractal)",
+        "parents" => "MATCH (parent:Fractal)-[:HAS_CHILD]->(Fractal {id: $id}) RETURN parent",
+        "children" => "MATCH (Fractal {id: $id})-[:HAS_CHILD]->(child:Fractal) RETURN child",
+        "contexts" => "MATCH (Fractal {id: $id})-[:HAS_CONTEXT]->(context:Fractal) RETURN context",
         _ => return Err(DataError::InvalidData("Invalid relation".to_string())),
     };
-    let query = format!("{} RETURN r.id, r.name, r.createdAt, r.updatedAt", query);
 
     let mut stmt = conn.prepare(&query)?;
     let result = conn.execute(&mut stmt, vec![("id", Value::UUID(*id))])?;
+
+    dbg!(relation);
 
     result.into_iter().map(|row| row_to_fractal(&row)).collect()
 }
@@ -248,12 +249,38 @@ fn row_to_knowledge(row: &[Value]) -> Result<Knowledge, DataError> {
 }
 
 fn row_to_fractal(row: &[Value]) -> Result<Fractal, DataError> {
-    Ok(Fractal {
-        id: extract_uuid(&row[0], "id")?,
-        name: extract_string(&row[1], "name")?,
-        created_at: extract_datetime(&row[2], "createdAt")?,
-        updated_at: extract_datetime(&row[3], "updatedAt")?,
-    })
+    dbg!(row);
+
+    if let Value::Node(node_val) = &row[0] {
+        let properties = node_val.get_properties();
+
+        let get_property = |name: &str| -> Result<&Value, DataError> {
+            properties
+                .iter()
+                .find(|(key, _)| key == name)
+                .map(|(_, value)| value)
+                .ok_or_else(|| DataError::InvalidData(format!("Missing {}", name)))
+        };
+
+        Ok(Fractal {
+            id: extract_uuid(get_property("id")?, "id")?,
+            name: extract_string(get_property("name")?, "name")?,
+            created_at: extract_datetime(get_property("createdAt")?, "createdAt")?,
+            updated_at: extract_datetime(get_property("updatedAt")?, "updatedAt")?,
+        })
+    } else {
+        let id = extract_uuid(&row[0], "id")?;
+        let name = extract_string(&row[1], "name")?;
+        let created_at = extract_datetime(&row[2], "createdAt")?;
+        let updated_at = extract_datetime(&row[3], "updatedAt")?;
+
+        Ok(Fractal {
+            id,
+            name,
+            created_at,
+            updated_at,
+        })
+    }
 }
 
 fn extract_uuid(value: &Value, field: &str) -> Result<Uuid, DataError> {
@@ -285,4 +312,70 @@ fn extract_datetime(value: &Value, field: &str) -> Result<DateTime<Utc>, DataErr
             field
         ))),
     }
+}
+
+pub fn get_root_fractal(conn: &Connection) -> Result<Fractal, DataError> {
+    get_fractal_by_name(conn, "Root")
+}
+
+pub fn delete_fractal(conn: &Connection, id: &Uuid) -> Result<bool, DataError> {
+    let query = "
+        MATCH (f:Fractal {id: $id})
+        DETACH DELETE f
+        RETURN count(f) > 0 as deleted
+    ";
+    let mut stmt = conn.prepare(query)?;
+    let result = conn.execute(&mut stmt, vec![("id", Value::UUID(*id))])?;
+
+    result
+        .into_iter()
+        .next()
+        .and_then(|row| match &row[0] {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        })
+        .ok_or_else(|| DataError::InvalidData("Failed to delete fractal".to_string()))
+}
+
+pub fn add_knowledge(
+    conn: &Connection,
+    fractal_id: &Uuid,
+    content: &str,
+    context_ids: &[Uuid],
+) -> Result<Knowledge, DataError> {
+    let query = "
+        MATCH (f:Fractal {id: $fractal_id})
+        CREATE (k:Knowledge {id: $knowledge_id, content: $content, createdAt: $datetime, updatedAt: $datetime})
+        CREATE (f)-[:HAS_KNOWLEDGE]->(k)
+        WITH k
+        UNWIND $context_ids as context_id
+        MATCH (c:Fractal {id: context_id})
+        CREATE (k)-[:IN_CONTEXT]->(c)
+        RETURN k.id, k.content
+    ";
+    let mut stmt = conn.prepare(query)?;
+    let result = conn.execute(
+        &mut stmt,
+        vec![
+            ("fractal_id", Value::UUID(*fractal_id)),
+            ("knowledge_id", Value::UUID(Uuid::new_v4())),
+            ("content", Value::String(content.to_string())),
+            ("datetime", Value::Timestamp(OffsetDateTime::now_utc())),
+            (
+                "context_ids",
+                Value::List(
+                    LogicalType::List {
+                        child_type: Box::new(LogicalType::UUID),
+                    },
+                    context_ids.iter().map(|&id| Value::UUID(id)).collect(),
+                ),
+            ),
+        ],
+    )?;
+
+    result
+        .into_iter()
+        .next()
+        .ok_or_else(|| DataError::InvalidData("Failed to create knowledge".to_string()))
+        .and_then(|row| row_to_knowledge(&row))
 }

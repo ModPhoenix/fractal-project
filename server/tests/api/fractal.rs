@@ -11,7 +11,7 @@ async fn test_fractal_query() {
     // GraphQL query
     let query = r#"
     query {
-        fractal(name: "Root") {
+        root {
             id
             name
             children {
@@ -45,7 +45,7 @@ async fn test_fractal_query() {
     assert!(body.get("data").is_some());
 
     // Check if the fractal data is present
-    let fractal = body["data"]["fractal"].as_object().unwrap();
+    let fractal = body["data"]["root"].as_object().unwrap();
     assert_eq!(fractal["name"], "Root");
 
     // Check if children are present
@@ -58,6 +58,26 @@ async fn test_create_fractal_mutation() {
     // Arrange
     let address = spawn_app().await;
     let client = Client::new();
+
+    // First, get the Root fractal ID
+    let root_query = r#"
+    query {
+        root {
+            id
+        }
+    }
+    "#;
+
+    let root_response = client
+        .post(&format!("{}", &address))
+        .header("Content-Type", "application/json")
+        .body(json!({"query": root_query}).to_string())
+        .send()
+        .await
+        .expect("Failed to execute root query request.");
+
+    let root_body = root_response.json::<serde_json::Value>().await.unwrap();
+    let root_id = root_body["data"]["root"]["id"].as_str().unwrap();
 
     // GraphQL mutation
     let mutation = r#"
@@ -76,7 +96,8 @@ async fn test_create_fractal_mutation() {
     let variables = json!({
         "input": {
             "name": "New Fractal",
-            "parentId": null
+            "parentId": root_id,
+            "contextIds": []
         }
     });
 
@@ -119,6 +140,26 @@ async fn test_fractal_name_uniqueness() {
     let address = spawn_app().await;
     let client = Client::new();
 
+    // First, get the Root fractal ID
+    let root_query = r#"
+    query {
+        root {
+            id
+        }
+    }
+    "#;
+
+    let root_response = client
+        .post(&format!("{}", &address))
+        .header("Content-Type", "application/json")
+        .body(json!({"query": root_query}).to_string())
+        .send()
+        .await
+        .expect("Failed to execute root query request.");
+
+    let root_body = root_response.json::<serde_json::Value>().await.unwrap();
+    let root_id = root_body["data"]["root"]["id"].as_str().unwrap();
+
     // GraphQL mutation
     let mutation = r#"
         mutation ($input: CreateFractalInput!) {
@@ -132,7 +173,8 @@ async fn test_fractal_name_uniqueness() {
     let variables = json!({
         "input": {
             "name": "Unique Fractal",
-            "parentId": null
+            "parentId": root_id,
+            "contextIds": []
         }
     });
 

@@ -1,5 +1,6 @@
 use kuzu::Database;
 use std::sync::Arc;
+use tower_http::cors::{Any, CorsLayer};
 
 pub mod data;
 pub mod graphql;
@@ -7,6 +8,7 @@ pub mod graphql;
 use async_graphql::{http::GraphiQLSource, EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
 use axum::{
+    http::Method,
     http::StatusCode,
     response::{self, IntoResponse},
     routing::get,
@@ -29,9 +31,16 @@ pub fn run(listener: TcpListener, db: Database) -> Result<Server, std::io::Error
     .data(state.clone())
     .finish();
 
+    let cors = CorsLayer::new()
+        // allow `GET` and `POST` when accessing the resource
+        .allow_methods([Method::GET, Method::POST])
+        // allow requests from any origin
+        .allow_origin(Any);
+
     let app = Router::new()
         .route("/", get(graphiql).post_service(GraphQL::new(schema)))
         .route("/health_check", get(health_check))
+        .layer(cors)
         .with_state(state);
 
     tracing::debug!(

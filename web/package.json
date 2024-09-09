@@ -12,10 +12,10 @@
   },
   "dependencies": {
     "@apollo/client": "3.11.8",
-    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-dialog": "1.1.1",
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-select": "^2.1.1",
-    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-slot": "1.1.0",
     "@radix-ui/react-tooltip": "^1.1.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -30,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^9.9.0",
     "@graphql-codegen/cli": "5.0.2",
+    "@graphql-codegen/client-preset": "4.3.3",
     "@types/node": "^22.5.4",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -46,7 +47,6 @@
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1",
-    "@graphql-codegen/client-preset": "4.3.3"
+    "vite": "^5.4.1"
   }
 }

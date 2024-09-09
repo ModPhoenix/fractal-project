@@ -1,24 +1,10 @@
-import { Layout } from "./components/layout";
-import { graphql } from "../src/api/gql";
-import { useQuery } from "@apollo/client";
-
-const root = graphql(`
-  query Root {
-    root {
-      id
-      name
-      children {
-        id
-        name
-      }
-    }
-  }
-`);
+import { FractalUi } from "@/components/fractal-ui";
+import { Layout } from "@/components/layout";
 
 export function App() {
-  const { data } = useQuery(root);
-
-  console.log("data", data);
-
-  return <Layout />;
+  return (
+    <Layout>
+      <FractalUi />
+    </Layout>
+  );
 }

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { graphql } from "@/api/gql";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -18,11 +17,127 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@apollo/client";
-import { FractalGraphQl } from "@/api/gql/graphql";
+import { useMutation, useQuery } from "@apollo/client";
+import { FractalGraphQl, graphql } from "@/api";
+import { DeepPartial } from "@apollo/client/utilities";
+
+export const Fractal = graphql(/* GraphQL */ `
+  fragment Fractal on FractalGraphQL {
+    id
+    name
+    createdAt
+    updatedAt
+    children {
+      id
+      name
+      children {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+      createdAt
+      updatedAt
+      parents {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+      contexts {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+    }
+    parents {
+      id
+      name
+      children {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+      createdAt
+      updatedAt
+      parents {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+      contexts {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+    }
+    contexts {
+      id
+      name
+      children {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+      createdAt
+      updatedAt
+      parents {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+      contexts {
+        id
+        name
+        createdAt
+        updatedAt
+      }
+    }
+  }
+`);
+
+const root = graphql(/* GraphQL */ `
+  query Root {
+    root {
+      ...Fractal
+    }
+  }
+`);
+
+const createFractalMutation = graphql(/* GraphQL */ `
+  mutation CreateFractal($input: CreateFractalInput!) {
+    createFractal(input: $input) {
+      ...Fractal
+    }
+  }
+`);
+
+export const FractalUi: React.FC = () => {
+  const { data, loading, error } = useQuery(root);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error || !data) {
+    return <div>Error: {error?.message ?? "No data"}</div>;
+  }
+
+  return (
+    <div className="p-4">
+      <FractalNode fractal={data.root} level={0} />
+    </div>
+  );
+};
 
 const FractalNode: React.FC<{
-  fractal: Partial<FractalGraphQl>;
+  fractal: DeepPartial<FractalGraphQl>;
   level: number;
 }> = ({ fractal, level }) => {
   const [isExpanded, setIsExpanded] = useState(level === 0);
@@ -32,8 +147,20 @@ const FractalNode: React.FC<{
   const [newFractalName, setNewFractalName] = useState("");
   const [newContextName, setNewContextName] = useState("");
   const [newKnowledge, setNewKnowledge] = useState("");
+  const [createFractal] = useMutation(createFractalMutation, {
+    refetchQueries: [{ query: root }],
+  });
 
   const handleAddFractal = () => {
+    createFractal({
+      variables: {
+        input: {
+          name: newFractalName,
+          parentId: fractal.id,
+          contextIds: [fractal.id],
+        },
+      },
+    });
     console.log(
       `Adding new fractal: ${newFractalName} to parent: ${fractal.id}`
     );
@@ -65,7 +192,7 @@ const FractalNode: React.FC<{
           className="mr-2 focus:outline-none"
           aria-label={isExpanded ? "Collapse" : "Expand"}
         >
-          {fractal?.children?.length > 0 ? (
+          {Boolean(!fractal?.children?.length) ? (
             isExpanded ? (
               <ChevronDownIcon className="w-4 h-4" />
             ) : (
@@ -139,55 +266,27 @@ const FractalNode: React.FC<{
       </div>
       {isExpanded && (
         <div className="ml-4">
-          {fractal?.contexts?.length > 0 && (
+          {Boolean(fractal?.contexts?.length) && (
             <div className="mb-2">
               <span className="text-sm font-medium text-gray-500">
                 Contexts:
               </span>
               <div className="flex flex-wrap gap-1 mt-1">
                 {fractal?.contexts?.map((context) => (
-                  <Badge key={context.id} variant="secondary">
-                    {context.name}
+                  <Badge key={context?.id} variant="secondary">
+                    {context?.name}
                   </Badge>
                 ))}
               </div>
             </div>
           )}
-          {fractal?.children?.map((child) => (
-            <FractalNode key={child.id} fractal={child} level={level + 1} />
-          ))}
+          {fractal?.children?.map((child) =>
+            child ? (
+              <FractalNode key={child?.id} fractal={child} level={level + 1} />
+            ) : null
+          )}
         </div>
       )}
     </div>
   );
 };
-
-const root = graphql(`
-  query Root {
-    root {
-      id
-      name
-      children {
-        id
-        name
-      }
-    }
-  }
-`);
-
-export function FractalUi() {
-  const { data } = useQuery(root);
-
-  console.log("data", data);
-
-  return (
-    <div className="p-6 rounded-lg shadow-sm">
-      <h1 className="text-2xl font-bold mb-4">Fractal Structure</h1>
-      {data ? (
-        <FractalNode fractal={data.root} level={0} />
-      ) : (
-        <div>Loading...</div>
-      )}
-    </div>
-  );
-}

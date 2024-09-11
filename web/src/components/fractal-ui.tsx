@@ -5,6 +5,7 @@ import {
   PlusCircleIcon,
   BookIcon,
   LinkIcon,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useMutation, useQuery } from "@apollo/client";
+import { useLazyQuery, useMutation, useQuery } from "@apollo/client";
 import { FractalGraphQl, graphql } from "@/api";
 import { DeepPartial } from "@apollo/client/utilities";
 
@@ -30,93 +31,27 @@ export const Fractal = graphql(/* GraphQL */ `
     children {
       id
       name
-      children {
-        id
-        name
-        createdAt
-        updatedAt
-        children {
-          id
-          name
-          createdAt
-          updatedAt
-        }
-        contexts {
-          id
-          name
-          createdAt
-          updatedAt
-        }
-      }
       createdAt
       updatedAt
-      parents {
-        id
-        name
-        createdAt
-        updatedAt
-      }
-      contexts {
-        id
-        name
-        createdAt
-        updatedAt
-      }
     }
     parents {
       id
       name
-      children {
-        id
-        name
-        createdAt
-        updatedAt
-      }
       createdAt
       updatedAt
-      parents {
-        id
-        name
-        createdAt
-        updatedAt
-      }
-      contexts {
-        id
-        name
-        createdAt
-        updatedAt
-      }
     }
     contexts {
       id
       name
-      children {
-        id
-        name
-        createdAt
-        updatedAt
-      }
       createdAt
       updatedAt
-      parents {
-        id
-        name
-        createdAt
-        updatedAt
-      }
-      contexts {
-        id
-        name
-        createdAt
-        updatedAt
-      }
     }
   }
 `);
 
-const root = graphql(/* GraphQL */ `
-  query Root {
-    root {
+const FRACTAL = graphql(/* GraphQL */ `
+  query Fractal($name: String) {
+    fractal(name: $name) {
       ...Fractal
     }
   }
@@ -131,7 +66,7 @@ const createFractalMutation = graphql(/* GraphQL */ `
 `);
 
 export const FractalUi: React.FC = () => {
-  const { data, loading, error } = useQuery(root);
+  const { data, loading, error } = useQuery(FRACTAL);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -141,11 +76,7 @@ export const FractalUi: React.FC = () => {
     return <div>Error: {error?.message ?? "No data"}</div>;
   }
 
-  return (
-    <div className="p-4">
-      <FractalNode fractal={data.root} level={0} />
-    </div>
-  );
+  return <FractalNode fractal={data.fractal} level={0} />;
 };
 
 const FractalNode: React.FC<{
@@ -159,8 +90,10 @@ const FractalNode: React.FC<{
   const [newFractalName, setNewFractalName] = useState("");
   const [newContextName, setNewContextName] = useState("");
   const [newKnowledge, setNewKnowledge] = useState("");
+
+  const [getFractal, { data, loading }] = useLazyQuery(FRACTAL);
   const [createFractal] = useMutation(createFractalMutation, {
-    refetchQueries: [{ query: root }],
+    refetchQueries: [{ query: FRACTAL, variables: { name: fractal.name } }],
   });
 
   const handleAddFractal = () => {
@@ -197,23 +130,28 @@ const FractalNode: React.FC<{
   };
 
   return (
-    <div className="ml-4">
+    <div className="">
       <div className="flex items-center mb-2">
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="mr-2 focus:outline-none"
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={async () => {
+            if (!fractal.children) {
+              await getFractal({ variables: { name: fractal.name } });
+            }
+            setIsExpanded((prev) => !prev);
+          }}
+          className="mr-2"
           aria-label={isExpanded ? "Collapse" : "Expand"}
         >
-          {Boolean(fractal?.children?.length) ? (
-            isExpanded ? (
-              <ChevronDownIcon className="w-4 h-4" />
-            ) : (
-              <ChevronRightIcon className="w-4 h-4" />
-            )
+          {loading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : isExpanded ? (
+            <ChevronDownIcon className="w-4 h-4" />
           ) : (
-            <div className="w-4" />
+            <ChevronRightIcon className="w-4 h-4" />
           )}
-        </button>
+        </Button>
         <span className="font-medium">{fractal.name}</span>
         <Dialog open={isAddFractalOpen} onOpenChange={setIsAddFractalOpen}>
           <DialogTrigger asChild>
@@ -292,7 +230,7 @@ const FractalNode: React.FC<{
               </div>
             </div>
           )}
-          {fractal?.children?.map((child) =>
+          {(fractal?.children ?? data?.fractal?.children)?.map((child) =>
             child ? (
               <FractalNode key={child?.id} fractal={child} level={level + 1} />
             ) : null

@@ -11,7 +11,7 @@ async fn test_fractal_query() {
     // GraphQL query
     let query = r#"
     query {
-        root {
+        fractal {
             id
             name
             children {
@@ -62,7 +62,7 @@ async fn test_create_fractal_mutation() {
     // First, get the Root fractal ID
     let root_query = r#"
     query {
-        root {
+        fractal {
             id
         }
     }
@@ -143,7 +143,7 @@ async fn test_fractal_name_uniqueness() {
     // First, get the Root fractal ID
     let root_query = r#"
     query {
-        root {
+        fractal {
             id
         }
     }

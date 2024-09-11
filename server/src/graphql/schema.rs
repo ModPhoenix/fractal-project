@@ -80,9 +80,11 @@ pub struct FractalQueries;
 
 #[Object]
 impl FractalQueries {
-    async fn fractal(&self, ctx: &Context<'_>, name: String) -> Result<FractalGraphQL> {
+    async fn fractal(&self, ctx: &Context<'_>, name: Option<String>) -> Result<FractalGraphQL> {
         let db = ctx.data::<Arc<Database>>()?;
         let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
+
+        let name = name.unwrap_or("Root".to_string());
         let fractal = data::get_fractal_by_name(&conn, &name).map_err(|e| match e {
             data::DataError::FractalNotFound(_) => {
                 GraphQLError::NotFound(format!("Fractal '{}' not found", name))
@@ -96,10 +98,6 @@ impl FractalQueries {
             created_at: fractal.created_at,
             updated_at: fractal.updated_at,
         })
-    }
-
-    async fn root(&self, ctx: &Context<'_>) -> Result<FractalGraphQL> {
-        self.fractal(ctx, "Root".to_string()).await
     }
 
     async fn knowledge(
@@ -197,7 +195,7 @@ impl KnowledgeGraphQL {
 
     async fn fractal(&self, ctx: &Context<'_>) -> FractalGraphQL {
         FractalQueries
-            .fractal(ctx, "Root".to_string())
+            .fractal(ctx, Some("Root".to_string()))
             .await
             .unwrap()
     }
@@ -218,17 +216,6 @@ impl From<Fractal> for FractalGraphQL {
 pub struct QueryRoot(FractalQueries);
 
 pub type FractalSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
-
-impl FractalGraphQL {
-    fn from_fractal(conn: &kuzu::Connection, f: Fractal) -> Result<Self, GraphQLError> {
-        Ok(FractalGraphQL {
-            id: f.id,
-            name: f.name,
-            created_at: f.created_at,
-            updated_at: f.updated_at,
-        })
-    }
-}
 
 impl KnowledgeGraphQL {
     fn from_knowledge(k: data::Knowledge) -> Result<Self, GraphQLError> {

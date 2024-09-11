@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client";
 import { FractalGraphQl, graphql } from "@/api";
 import { DeepPartial } from "@apollo/client/utilities";
-
 export const Fractal = graphql(/* GraphQL */ `
   fragment Fractal on FractalGraphQL {
     id
@@ -33,6 +32,10 @@ export const Fractal = graphql(/* GraphQL */ `
       name
       createdAt
       updatedAt
+      children {
+        id
+        name
+      }
     }
     parents {
       id
@@ -84,49 +87,119 @@ const FractalNode: React.FC<{
   level: number;
 }> = ({ fractal, level }) => {
   const [isExpanded, setIsExpanded] = useState(level === 0);
-  const [isAddFractalOpen, setIsAddFractalOpen] = useState(false);
-  const [isAddContextOpen, setIsAddContextOpen] = useState(false);
-  const [isAddKnowledgeOpen, setIsAddKnowledgeOpen] = useState(false);
-  const [newFractalName, setNewFractalName] = useState("");
-  const [newContextName, setNewContextName] = useState("");
-  const [newKnowledge, setNewKnowledge] = useState("");
+  const [dialogState, setDialogState] = useState({
+    isAddFractalOpen: false,
+    isAddContextOpen: false,
+    isAddKnowledgeOpen: false,
+  });
+  const [inputState, setInputState] = useState({
+    newFractal: "",
+    newContext: "",
+    newKnowledge: "",
+  });
 
   const [getFractal, { data, loading }] = useLazyQuery(FRACTAL);
   const [createFractal] = useMutation(createFractalMutation, {
     refetchQueries: [{ query: FRACTAL, variables: { name: fractal.name } }],
   });
 
-  const handleAddFractal = () => {
-    createFractal({
-      variables: {
-        input: {
-          name: newFractalName,
-          parentId: fractal.id,
-          contextIds: [fractal.id],
-        },
-      },
-    });
-    console.log(
-      `Adding new fractal: ${newFractalName} to parent: ${fractal.id}`
-    );
-    setNewFractalName("");
-    setIsAddFractalOpen(false);
+  const handleInputChange =
+    (key: keyof typeof inputState) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setInputState((prev) => ({ ...prev, [key]: e.target.value }));
+    };
+
+  const handleDialogChange =
+    (key: keyof typeof dialogState) => (isOpen: boolean) => {
+      setDialogState((prev) => ({ ...prev, [key]: isOpen }));
+    };
+
+  const handleAddItem = (type: "fractal" | "context" | "knowledge") => () => {
+    const {
+      newFractal: newFractalName,
+      newContext: newContextName,
+      newKnowledge,
+    } = inputState;
+    switch (type) {
+      case "fractal":
+        createFractal({
+          variables: {
+            input: {
+              name: newFractalName,
+              parentId: fractal.id,
+              contextIds: [fractal.id],
+            },
+          },
+        });
+        console.log(
+          `Adding new fractal: ${newFractalName} to parent: ${fractal.id}`
+        );
+        break;
+      case "context":
+        console.log(
+          `Adding new context: ${newContextName} to fractal: ${fractal.id}`
+        );
+        break;
+      case "knowledge":
+        console.log(
+          `Adding new knowledge: ${newKnowledge} to fractal: ${fractal.id}`
+        );
+        break;
+    }
+
+    const capitalizedType = (type.charAt(0).toUpperCase() +
+      type.slice(1)) as Capitalize<typeof type>;
+
+    setInputState((prev) => ({
+      ...prev,
+      [`new${capitalizedType}Name`]: "",
+    }));
+
+    handleDialogChange(`isAdd${capitalizedType}Open`)(false);
   };
 
-  const handleAddContext = () => {
-    console.log(
-      `Adding new context: ${newContextName} to fractal: ${fractal.id}`
-    );
-    setNewContextName("");
-    setIsAddContextOpen(false);
-  };
+  const renderDialog = (type: "fractal" | "context" | "knowledge") => {
+    const capitalizedType = (type.charAt(0).toUpperCase() +
+      type.slice(1)) as Capitalize<typeof type>;
+    const isOpen =
+      dialogState[`isAdd${capitalizedType}Open` as keyof typeof dialogState];
+    const inputValue =
+      inputState[`new${capitalizedType}Name` as keyof typeof inputState];
+    const InputComponent = type === "knowledge" ? Textarea : Input;
 
-  const handleAddKnowledge = () => {
-    console.log(
-      `Adding new knowledge: ${newKnowledge} to fractal: ${fractal.id}`
+    return (
+      <Dialog
+        open={isOpen}
+        onOpenChange={handleDialogChange(`isAdd${capitalizedType}Open`)}
+      >
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" className="ml-2">
+            {type === "fractal" ? (
+              <PlusCircleIcon className="w-4 h-4" />
+            ) : type === "context" ? (
+              <LinkIcon className="w-4 h-4" />
+            ) : (
+              <BookIcon className="w-4 h-4" />
+            )}
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New {capitalizedType}</DialogTitle>
+          </DialogHeader>
+          <div
+            className={`flex ${type === "knowledge" ? "flex-col space-y-2" : "items-center space-x-2"}`}
+          >
+            <InputComponent
+              placeholder={`${capitalizedType} ${type === "knowledge" ? "content" : "name"}`}
+              value={inputValue}
+              onChange={handleInputChange(`new${capitalizedType}`)}
+            />
+            <Button onClick={handleAddItem(type)}>Add</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
-    setNewKnowledge("");
-    setIsAddKnowledgeOpen(false);
   };
 
   return (
@@ -153,66 +226,9 @@ const FractalNode: React.FC<{
           )}
         </Button>
         <span className="font-medium">{fractal.name}</span>
-        <Dialog open={isAddFractalOpen} onOpenChange={setIsAddFractalOpen}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="ml-2">
-              <PlusCircleIcon className="w-4 h-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Fractal</DialogTitle>
-            </DialogHeader>
-            <div className="flex items-center space-x-2">
-              <Input
-                placeholder="Fractal name"
-                value={newFractalName}
-                onChange={(e) => setNewFractalName(e.target.value)}
-              />
-              <Button onClick={handleAddFractal}>Add</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={isAddContextOpen} onOpenChange={setIsAddContextOpen}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="ml-2">
-              <LinkIcon className="w-4 h-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Context</DialogTitle>
-            </DialogHeader>
-            <div className="flex items-center space-x-2">
-              <Input
-                placeholder="Context name"
-                value={newContextName}
-                onChange={(e) => setNewContextName(e.target.value)}
-              />
-              <Button onClick={handleAddContext}>Add</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={isAddKnowledgeOpen} onOpenChange={setIsAddKnowledgeOpen}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="ml-2">
-              <BookIcon className="w-4 h-4" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Knowledge</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col space-y-2">
-              <Textarea
-                placeholder="Knowledge content"
-                value={newKnowledge}
-                onChange={(e) => setNewKnowledge(e.target.value)}
-              />
-              <Button onClick={handleAddKnowledge}>Add</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {renderDialog("fractal")}
+        {renderDialog("context")}
+        {renderDialog("knowledge")}
       </div>
       {isExpanded && (
         <div className="ml-4">

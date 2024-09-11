@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::data::{self, Fractal};
 use async_graphql::{
-    Context, EmptySubscription, InputObject, MergedObject, Object, Result, Schema, SimpleObject,
+    Context, EmptySubscription, InputObject, MergedObject, Object, Result, Schema,
 };
 use kuzu::Database;
 use uuid::Uuid;
@@ -68,7 +68,7 @@ impl FractalMutations {
             data::add_knowledge(&conn, &input.fractal_id, &input.content, &input.context)
                 .map_err(GraphQLError::from)?;
 
-        Ok(KnowledgeGraphQL::from_knowledge(&conn, knowledge)?)
+        Ok(KnowledgeGraphQL::from_knowledge(knowledge)?)
     }
 }
 
@@ -90,21 +90,11 @@ impl FractalQueries {
             _ => GraphQLError::from(e),
         })?;
 
-        let children = data::get_fractal_relations(&conn, &fractal.id, "children")
-            .map_err(GraphQLError::from)?;
-        let parents = data::get_fractal_relations(&conn, &fractal.id, "parents")
-            .map_err(GraphQLError::from)?;
-        let contexts = data::get_fractal_relations(&conn, &fractal.id, "contexts")
-            .map_err(GraphQLError::from)?;
-
         Ok(FractalGraphQL {
             id: fractal.id,
             name: fractal.name,
-            children: children.into_iter().map(FractalGraphQL::from).collect(),
             created_at: fractal.created_at,
             updated_at: fractal.updated_at,
-            parents: parents.into_iter().map(FractalGraphQL::from).collect(),
-            contexts: contexts.into_iter().map(FractalGraphQL::from).collect(),
         })
     }
 
@@ -127,31 +117,90 @@ impl FractalQueries {
             return Err(GraphQLError::NotFound("Knowledge not found".to_string()).into());
         }
 
-        let fractal = self.fractal(ctx, fractal_name).await?;
-
         Ok(KnowledgeGraphQL {
             id: knowledge[0].id,
             content: knowledge[0].content.clone(),
-            fractal,
         })
     }
 }
 
-#[derive(SimpleObject)]
 struct FractalGraphQL {
     id: Uuid,
     name: String,
-    children: Vec<FractalGraphQL>,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
-    parents: Vec<FractalGraphQL>,
-    contexts: Vec<FractalGraphQL>,
 }
-#[derive(SimpleObject)]
+
+#[Object]
+impl FractalGraphQL {
+    async fn id(&self) -> Uuid {
+        self.id
+    }
+
+    async fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    async fn children(&self, ctx: &Context<'_>) -> Result<Vec<FractalGraphQL>> {
+        let db = ctx.data::<Arc<Database>>()?;
+        let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
+
+        let children =
+            data::get_fractal_relations(&conn, &self.id, "children").map_err(GraphQLError::from)?;
+
+        Ok(children.into_iter().map(FractalGraphQL::from).collect())
+    }
+
+    async fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.created_at
+    }
+
+    async fn updated_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.updated_at
+    }
+
+    async fn parents(&self, ctx: &Context<'_>) -> Result<Vec<FractalGraphQL>> {
+        let db = ctx.data::<Arc<Database>>()?;
+        let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
+
+        let children =
+            data::get_fractal_relations(&conn, &self.id, "parents").map_err(GraphQLError::from)?;
+
+        Ok(children.into_iter().map(FractalGraphQL::from).collect())
+    }
+
+    async fn contexts(&self, ctx: &Context<'_>) -> Result<Vec<FractalGraphQL>> {
+        let db = ctx.data::<Arc<Database>>()?;
+        let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
+
+        let children =
+            data::get_fractal_relations(&conn, &self.id, "contexts").map_err(GraphQLError::from)?;
+
+        Ok(children.into_iter().map(FractalGraphQL::from).collect())
+    }
+}
+
 struct KnowledgeGraphQL {
     id: Uuid,
     content: String,
-    fractal: FractalGraphQL,
+}
+
+#[Object]
+impl KnowledgeGraphQL {
+    async fn id(&self) -> Uuid {
+        self.id
+    }
+
+    async fn content(&self) -> String {
+        self.content.clone()
+    }
+
+    async fn fractal(&self, ctx: &Context<'_>) -> FractalGraphQL {
+        FractalQueries
+            .fractal(ctx, "Root".to_string())
+            .await
+            .unwrap()
+    }
 }
 
 impl From<Fractal> for FractalGraphQL {
@@ -159,11 +208,8 @@ impl From<Fractal> for FractalGraphQL {
         FractalGraphQL {
             id: f.id,
             name: f.name,
-            children: Vec::new(),
             created_at: f.created_at,
             updated_at: f.updated_at,
-            parents: Vec::new(),
-            contexts: Vec::new(),
         }
     }
 }
@@ -172,36 +218,23 @@ impl From<Fractal> for FractalGraphQL {
 pub struct QueryRoot(FractalQueries);
 
 pub type FractalSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
+
 impl FractalGraphQL {
     fn from_fractal(conn: &kuzu::Connection, f: Fractal) -> Result<Self, GraphQLError> {
-        let children =
-            data::get_fractal_relations(conn, &f.id, "children").map_err(GraphQLError::from)?;
-        let parents =
-            data::get_fractal_relations(conn, &f.id, "parents").map_err(GraphQLError::from)?;
-        let contexts =
-            data::get_fractal_relations(conn, &f.id, "contexts").map_err(GraphQLError::from)?;
-
         Ok(FractalGraphQL {
             id: f.id,
             name: f.name,
-            children: children.into_iter().map(FractalGraphQL::from).collect(),
             created_at: f.created_at,
             updated_at: f.updated_at,
-            parents: parents.into_iter().map(FractalGraphQL::from).collect(),
-            contexts: contexts.into_iter().map(FractalGraphQL::from).collect(),
         })
     }
 }
 
 impl KnowledgeGraphQL {
-    fn from_knowledge(conn: &kuzu::Connection, k: data::Knowledge) -> Result<Self, GraphQLError> {
-        let fractal = data::get_fractal_by_name(conn, &k.content).map_err(GraphQLError::from)?;
-        let fractal_graphql = FractalGraphQL::from_fractal(conn, fractal)?;
-
+    fn from_knowledge(k: data::Knowledge) -> Result<Self, GraphQLError> {
         Ok(KnowledgeGraphQL {
             id: k.id,
             content: k.content,
-            fractal: fractal_graphql,
         })
     }
 }

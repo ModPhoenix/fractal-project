@@ -35,6 +35,18 @@ export const Fractal = graphql(/* GraphQL */ `
         name
         createdAt
         updatedAt
+        children {
+          id
+          name
+          createdAt
+          updatedAt
+        }
+        contexts {
+          id
+          name
+          createdAt
+          updatedAt
+        }
       }
       createdAt
       updatedAt
@@ -192,7 +204,7 @@ const FractalNode: React.FC<{
           className="mr-2 focus:outline-none"
           aria-label={isExpanded ? "Collapse" : "Expand"}
         >
-          {Boolean(!fractal?.children?.length) ? (
+          {Boolean(fractal?.children?.length) ? (
             isExpanded ? (
               <ChevronDownIcon className="w-4 h-4" />
             ) : (

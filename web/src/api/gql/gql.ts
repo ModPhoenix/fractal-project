@@ -13,7 +13,7 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  * Therefore it is highly recommended to use the babel or swc plugin for production.
  */
 const documents = {
-    "\n  fragment Fractal on FractalGraphQL {\n    id\n    name\n    createdAt\n    updatedAt\n    children {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    parents {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    contexts {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n  }\n": types.FractalFragmentDoc,
+    "\n  fragment Fractal on FractalGraphQL {\n    id\n    name\n    createdAt\n    updatedAt\n    children {\n      id\n      name\n      createdAt\n      updatedAt\n      children {\n        id\n        name\n      }\n    }\n    parents {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    contexts {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n  }\n": types.FractalFragmentDoc,
     "\n  query Fractal($name: String) {\n    fractal(name: $name) {\n      ...Fractal\n    }\n  }\n": types.FractalDocument,
     "\n  mutation CreateFractal($input: CreateFractalInput!) {\n    createFractal(input: $input) {\n      ...Fractal\n    }\n  }\n": types.CreateFractalDocument,
 };
@@ -35,7 +35,7 @@ export function graphql(source: string): unknown;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  fragment Fractal on FractalGraphQL {\n    id\n    name\n    createdAt\n    updatedAt\n    children {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    parents {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    contexts {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n  }\n"): (typeof documents)["\n  fragment Fractal on FractalGraphQL {\n    id\n    name\n    createdAt\n    updatedAt\n    children {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    parents {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    contexts {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n  }\n"];
+export function graphql(source: "\n  fragment Fractal on FractalGraphQL {\n    id\n    name\n    createdAt\n    updatedAt\n    children {\n      id\n      name\n      createdAt\n      updatedAt\n      children {\n        id\n        name\n      }\n    }\n    parents {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    contexts {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n  }\n"): (typeof documents)["\n  fragment Fractal on FractalGraphQL {\n    id\n    name\n    createdAt\n    updatedAt\n    children {\n      id\n      name\n      createdAt\n      updatedAt\n      children {\n        id\n        name\n      }\n    }\n    parents {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    contexts {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

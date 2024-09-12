@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client";
 import { FractalGraphQl, graphql } from "@/api";
 import { DeepPartial } from "@apollo/client/utilities";
+
 export const Fractal = graphql(/* GraphQL */ `
   fragment Fractal on FractalGraphQL {
     id
@@ -60,7 +61,7 @@ const FRACTAL = graphql(/* GraphQL */ `
   }
 `);
 
-const createFractalMutation = graphql(/* GraphQL */ `
+const CREATE_FRACTAL = graphql(/* GraphQL */ `
   mutation CreateFractal($input: CreateFractalInput!) {
     createFractal(input: $input) {
       ...Fractal
@@ -82,118 +83,92 @@ export const FractalUi: React.FC = () => {
   return <FractalNode fractal={data.fractal} level={0} />;
 };
 
+type DialogType = "fractal" | "context" | "knowledge";
+
 const FractalNode: React.FC<{
   fractal: DeepPartial<FractalGraphQl>;
   level: number;
 }> = ({ fractal, level }) => {
   const [isExpanded, setIsExpanded] = useState(level === 0);
-  const [dialogState, setDialogState] = useState({
-    isAddFractalOpen: false,
-    isAddContextOpen: false,
-    isAddKnowledgeOpen: false,
+  const [dialogState, setDialogState] = useState<Record<DialogType, boolean>>({
+    fractal: false,
+    context: false,
+    knowledge: false,
   });
-  const [inputState, setInputState] = useState({
-    newFractal: "",
-    newContext: "",
-    newKnowledge: "",
+  const [inputState, setInputState] = useState<Record<DialogType, string>>({
+    fractal: "",
+    context: "",
+    knowledge: "",
   });
 
   const [getFractal, { data, loading }] = useLazyQuery(FRACTAL);
-  const [createFractal] = useMutation(createFractalMutation, {
+  const [createFractal] = useMutation(CREATE_FRACTAL, {
     refetchQueries: [{ query: FRACTAL, variables: { name: fractal.name } }],
   });
 
   const handleInputChange =
-    (key: keyof typeof inputState) =>
+    (type: DialogType) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setInputState((prev) => ({ ...prev, [key]: e.target.value }));
+      setInputState((prev) => ({ ...prev, [type]: e.target.value }));
     };
 
-  const handleDialogChange =
-    (key: keyof typeof dialogState) => (isOpen: boolean) => {
-      setDialogState((prev) => ({ ...prev, [key]: isOpen }));
-    };
-
-  const handleAddItem = (type: "fractal" | "context" | "knowledge") => () => {
-    const {
-      newFractal: newFractalName,
-      newContext: newContextName,
-      newKnowledge,
-    } = inputState;
-    switch (type) {
-      case "fractal":
-        createFractal({
-          variables: {
-            input: {
-              name: newFractalName,
-              parentId: fractal.id,
-              contextIds: [fractal.id],
-            },
-          },
-        });
-        console.log(
-          `Adding new fractal: ${newFractalName} to parent: ${fractal.id}`
-        );
-        break;
-      case "context":
-        console.log(
-          `Adding new context: ${newContextName} to fractal: ${fractal.id}`
-        );
-        break;
-      case "knowledge":
-        console.log(
-          `Adding new knowledge: ${newKnowledge} to fractal: ${fractal.id}`
-        );
-        break;
-    }
-
-    const capitalizedType = (type.charAt(0).toUpperCase() +
-      type.slice(1)) as Capitalize<typeof type>;
-
-    setInputState((prev) => ({
-      ...prev,
-      [`new${capitalizedType}Name`]: "",
-    }));
-
-    handleDialogChange(`isAdd${capitalizedType}Open`)(false);
+  const toggleDialog = (type: DialogType, isOpen: boolean) => {
+    setDialogState((prev) => ({ ...prev, [type]: isOpen }));
   };
 
-  const renderDialog = (type: "fractal" | "context" | "knowledge") => {
-    const capitalizedType = (type.charAt(0).toUpperCase() +
-      type.slice(1)) as Capitalize<typeof type>;
-    const isOpen =
-      dialogState[`isAdd${capitalizedType}Open` as keyof typeof dialogState];
-    const inputValue =
-      inputState[`new${capitalizedType}Name` as keyof typeof inputState];
+  const handleAddItem = (type: DialogType) => () => {
+    const inputValue = inputState[type];
+    if (!inputValue) return;
+
+    if (type === "fractal") {
+      createFractal({
+        variables: {
+          input: {
+            name: inputValue,
+            parentId: fractal.id,
+            contextIds: [fractal.id],
+          },
+        },
+      });
+    } else {
+      console.log(
+        `Adding new ${type}: ${inputValue} to fractal: ${fractal.id}`
+      );
+    }
+
+    setInputState((prev) => ({ ...prev, [type]: "" }));
+    toggleDialog(type, false);
+  };
+
+  const renderDialog = (type: DialogType, IconComponent: React.ReactNode) => {
+    const isOpen = dialogState[type];
+    const inputValue = inputState[type];
     const InputComponent = type === "knowledge" ? Textarea : Input;
+    const placeholder = `${type.charAt(0).toUpperCase() + type.slice(1)} ${
+      type === "knowledge" ? "content" : "name"
+    }`;
 
     return (
       <Dialog
         open={isOpen}
-        onOpenChange={handleDialogChange(`isAdd${capitalizedType}Open`)}
+        onOpenChange={(isOpen) => toggleDialog(type, isOpen)}
       >
         <DialogTrigger asChild>
           <Button variant="ghost" size="icon" className="ml-2">
-            {type === "fractal" ? (
-              <PlusCircleIcon className="w-4 h-4" />
-            ) : type === "context" ? (
-              <LinkIcon className="w-4 h-4" />
-            ) : (
-              <BookIcon className="w-4 h-4" />
-            )}
+            {IconComponent}
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New {capitalizedType}</DialogTitle>
+            <DialogTitle>
+              Add New {type.charAt(0).toUpperCase() + type.slice(1)}
+            </DialogTitle>
           </DialogHeader>
-          <div
-            className={`flex ${type === "knowledge" ? "flex-col space-y-2" : "items-center space-x-2"}`}
-          >
+          <div className="flex flex-col space-y-2">
             <InputComponent
-              placeholder={`${capitalizedType} ${type === "knowledge" ? "content" : "name"}`}
+              placeholder={placeholder}
               value={inputValue}
-              onChange={handleInputChange(`new${capitalizedType}`)}
+              onChange={handleInputChange(type)}
             />
             <Button onClick={handleAddItem(type)}>Add</Button>
           </div>
@@ -202,8 +177,14 @@ const FractalNode: React.FC<{
     );
   };
 
+  const dialogConfigs: { type: DialogType; icon: React.ReactNode }[] = [
+    { type: "fractal", icon: <PlusCircleIcon className="w-4 h-4" /> },
+    { type: "context", icon: <LinkIcon className="w-4 h-4" /> },
+    { type: "knowledge", icon: <BookIcon className="w-4 h-4" /> },
+  ];
+
   return (
-    <div className="">
+    <div>
       <div className="flex items-center mb-2">
         <Button
           size="icon"
@@ -218,7 +199,7 @@ const FractalNode: React.FC<{
           aria-label={isExpanded ? "Collapse" : "Expand"}
         >
           {loading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : isExpanded ? (
             <ChevronDownIcon className="w-4 h-4" />
           ) : (
@@ -226,30 +207,35 @@ const FractalNode: React.FC<{
           )}
         </Button>
         <span className="font-medium">{fractal.name}</span>
-        {renderDialog("fractal")}
-        {renderDialog("context")}
-        {renderDialog("knowledge")}
+        {dialogConfigs.map(({ type, icon }) => renderDialog(type, icon))}
       </div>
       {isExpanded && (
         <div className="ml-4">
-          {Boolean(fractal?.contexts?.length) && (
+          {(fractal?.contexts?.length ?? 0) > 0 && (
             <div className="mb-2">
               <span className="text-sm font-medium text-gray-500">
                 Contexts:
               </span>
               <div className="flex flex-wrap gap-1 mt-1">
-                {fractal?.contexts?.map((context) => (
-                  <Badge key={context?.id} variant="secondary">
-                    {context?.name}
-                  </Badge>
-                ))}
+                {fractal?.contexts?.map(
+                  (context) =>
+                    context && (
+                      <Badge key={context.id} variant="secondary">
+                        {context.name}
+                      </Badge>
+                    )
+                )}
               </div>
             </div>
           )}
-          {(fractal?.children ?? data?.fractal?.children)?.map((child) =>
-            child ? (
-              <FractalNode key={child?.id} fractal={child} level={level + 1} />
-            ) : null
+          {(
+            fractal.children ??
+            (data?.fractal as DeepPartial<FractalGraphQl>)?.children
+          )?.map(
+            (child) =>
+              child && (
+                <FractalNode key={child.id} fractal={child} level={level + 1} />
+              )
           )}
         </div>
       )}

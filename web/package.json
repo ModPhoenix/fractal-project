@@ -29,6 +29,7 @@
     "vaul": "^0.9.2"
   },
   "devDependencies": {
+    "@0no-co/graphqlsp": "1.12.14",
     "@eslint/js": "^9.9.0",
     "@graphql-codegen/cli": "5.0.2",
     "@graphql-codegen/client-preset": "4.3.3",

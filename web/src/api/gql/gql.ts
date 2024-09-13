@@ -17,6 +17,7 @@ const documents = {
     "\n  query Fractal($name: String) {\n    fractal(name: $name) {\n      ...Fractal\n    }\n  }\n": types.FractalDocument,
     "\n  mutation CreateFractal($input: CreateFractalInput!) {\n    createFractal(input: $input) {\n      ...Fractal\n    }\n  }\n": types.CreateFractalDocument,
     "\n  mutation AddRelation($parentId: UUID!, $childId: UUID!) {\n    addRelation(parentId: $parentId, childId: $childId)\n  }\n": types.AddRelationDocument,
+    "\n  mutation DeleteFractal($deleteFractalId: UUID!) {\n    deleteFractal(id: $deleteFractalId)\n  }\n": types.DeleteFractalDocument,
 };
 
 /**
@@ -49,6 +50,10 @@ export function graphql(source: "\n  mutation CreateFractal($input: CreateFracta
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation AddRelation($parentId: UUID!, $childId: UUID!) {\n    addRelation(parentId: $parentId, childId: $childId)\n  }\n"): (typeof documents)["\n  mutation AddRelation($parentId: UUID!, $childId: UUID!) {\n    addRelation(parentId: $parentId, childId: $childId)\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation DeleteFractal($deleteFractalId: UUID!) {\n    deleteFractal(id: $deleteFractalId)\n  }\n"): (typeof documents)["\n  mutation DeleteFractal($deleteFractalId: UUID!) {\n    deleteFractal(id: $deleteFractalId)\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

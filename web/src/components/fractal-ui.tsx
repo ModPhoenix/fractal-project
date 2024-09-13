@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -6,7 +6,10 @@ import {
   BookIcon,
   LinkIcon,
   Loader2,
+  CopyIcon,
+  CheckIcon,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client";
 import { FractalGraphQl, graphql } from "@/api";
 import { DeepPartial } from "@apollo/client/utilities";
+import { useToast } from "@/hooks/use-toast";
 
 export const Fractal = graphql(/* GraphQL */ `
   fragment Fractal on FractalGraphQL {
@@ -69,6 +73,12 @@ const CREATE_FRACTAL = graphql(/* GraphQL */ `
   }
 `);
 
+const ADD_RELATION = graphql(/* GraphQL */ `
+  mutation AddRelation($parentId: UUID!, $childId: UUID!) {
+    addRelation(parentId: $parentId, childId: $childId)
+  }
+`);
+
 export const FractalUi: React.FC = () => {
   const { data, loading, error } = useQuery(FRACTAL);
 
@@ -100,9 +110,15 @@ const FractalNode: React.FC<{
     context: "",
     knowledge: "",
   });
+  const { toast } = useToast();
+
+  const [isCopied, setIsCopied] = useState(false);
 
   const [getFractal, { data, loading }] = useLazyQuery(FRACTAL);
   const [createFractal] = useMutation(CREATE_FRACTAL, {
+    refetchQueries: [{ query: FRACTAL, variables: { name: fractal.name } }],
+  });
+  const [addRelation] = useMutation(ADD_RELATION, {
     refetchQueries: [{ query: FRACTAL, variables: { name: fractal.name } }],
   });
 
@@ -130,6 +146,13 @@ const FractalNode: React.FC<{
           },
         },
       });
+    } else if (type === "context") {
+      addRelation({
+        variables: {
+          parentId: fractal.id,
+          childId: inputValue,
+        },
+      });
     } else {
       console.log(
         `Adding new ${type}: ${inputValue} to fractal: ${fractal.id}`
@@ -150,6 +173,7 @@ const FractalNode: React.FC<{
 
     return (
       <Dialog
+        key={type}
         open={isOpen}
         onOpenChange={(isOpen) => toggleDialog(type, isOpen)}
       >
@@ -176,6 +200,30 @@ const FractalNode: React.FC<{
       </Dialog>
     );
   };
+
+  const copyToClipboard = useCallback(() => {
+    if (fractal.id) {
+      console.log("Copying: ", fractal.id);
+      navigator.clipboard
+        .writeText(fractal.id)
+        .then(() => {
+          setIsCopied(true);
+          toast({
+            title: "Copied!",
+            description: "Fractal ID has been copied to clipboard.",
+          });
+          setTimeout(() => setIsCopied(false), 2000);
+        })
+        .catch((err) => {
+          console.error("Failed to copy: ", err);
+          toast({
+            title: "Error",
+            description: "Failed to copy Fractal ID.",
+            variant: "destructive",
+          });
+        });
+    }
+  }, [fractal.id]);
 
   const dialogConfigs: { type: DialogType; icon: React.ReactNode }[] = [
     { type: "fractal", icon: <PlusCircleIcon className="w-4 h-4" /> },
@@ -204,6 +252,19 @@ const FractalNode: React.FC<{
             <ChevronDownIcon className="w-4 h-4" />
           ) : (
             <ChevronRightIcon className="w-4 h-4" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-2"
+          onClick={copyToClipboard}
+          title="Copy Fractal ID"
+        >
+          {isCopied ? (
+            <CheckIcon className="w-4 h-4 text-green-500" />
+          ) : (
+            <CopyIcon className="w-4 h-4" />
           )}
         </Button>
         <span className="font-medium">{fractal.name}</span>

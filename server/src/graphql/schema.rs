@@ -56,6 +56,20 @@ impl FractalMutations {
             .map_err(Into::into)
     }
 
+    async fn add_relation(
+        &self,
+        ctx: &Context<'_>,
+        parent_id: Uuid,
+        child_id: Uuid,
+    ) -> Result<bool> {
+        let db = ctx.data::<Arc<Database>>()?;
+        let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
+
+        data::add_has_child_edge(&conn, &parent_id, &child_id).map_err(GraphQLError::from)?;
+
+        Ok(true)
+    }
+
     async fn add_knowledge(
         &self,
         ctx: &Context<'_>,

@@ -136,7 +136,7 @@ pub fn create_fractal(
     Ok(fractal)
 }
 
-fn add_has_child_edge(
+pub fn add_has_child_edge(
     conn: &Connection,
     parent_id: &Uuid,
     child_id: &Uuid,
@@ -154,7 +154,7 @@ fn add_has_child_edge(
     Ok(())
 }
 
-fn add_has_context_edge(
+pub fn add_has_context_edge(
     conn: &Connection,
     fractal_id: &Uuid,
     context_id: &Uuid,

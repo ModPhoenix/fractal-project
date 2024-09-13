@@ -16,6 +16,7 @@ const documents = {
     "\n  fragment Fractal on FractalGraphQL {\n    id\n    name\n    createdAt\n    updatedAt\n    children {\n      id\n      name\n      createdAt\n      updatedAt\n      children {\n        id\n        name\n      }\n    }\n    parents {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n    contexts {\n      id\n      name\n      createdAt\n      updatedAt\n    }\n  }\n": types.FractalFragmentDoc,
     "\n  query Fractal($name: String) {\n    fractal(name: $name) {\n      ...Fractal\n    }\n  }\n": types.FractalDocument,
     "\n  mutation CreateFractal($input: CreateFractalInput!) {\n    createFractal(input: $input) {\n      ...Fractal\n    }\n  }\n": types.CreateFractalDocument,
+    "\n  mutation AddRelation($parentId: UUID!, $childId: UUID!) {\n    addRelation(parentId: $parentId, childId: $childId)\n  }\n": types.AddRelationDocument,
 };
 
 /**
@@ -44,6 +45,10 @@ export function graphql(source: "\n  query Fractal($name: String) {\n    fractal
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation CreateFractal($input: CreateFractalInput!) {\n    createFractal(input: $input) {\n      ...Fractal\n    }\n  }\n"): (typeof documents)["\n  mutation CreateFractal($input: CreateFractalInput!) {\n    createFractal(input: $input) {\n      ...Fractal\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation AddRelation($parentId: UUID!, $childId: UUID!) {\n    addRelation(parentId: $parentId, childId: $childId)\n  }\n"): (typeof documents)["\n  mutation AddRelation($parentId: UUID!, $childId: UUID!) {\n    addRelation(parentId: $parentId, childId: $childId)\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

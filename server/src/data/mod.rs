@@ -56,7 +56,11 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
             updatedAt TIMESTAMP,
             PRIMARY KEY (id)
         )",
-        "CREATE REL TABLE IF NOT EXISTS HAS_CHILD(FROM Fractal TO Fractal)",
+        "CREATE REL TABLE IF NOT EXISTS HAS_CHILD (
+            FROM Fractal
+            TO Fractal,
+            context_id UUID
+        )",
         "CREATE REL TABLE IF NOT EXISTS HAS_CONTEXT(FROM Fractal TO Fractal)",
         "CREATE REL TABLE IF NOT EXISTS HAS_KNOWLEDGE(FROM Fractal TO Knowledge)",
         "CREATE REL TABLE IF NOT EXISTS IN_CONTEXT(FROM Knowledge TO Fractal)",
@@ -66,9 +70,43 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
         conn.query(query)?;
     }
 
-    create_root_fractal(conn)?;
+    println!("Database tables created.");
+
+    setup_example_graph(conn)?;
 
     println!("Database initialization completed.");
+    Ok(())
+}
+
+fn setup_example_graph(conn: &Connection) -> Result<(), DataError> {
+    // Create Fractal nodes
+    let root = create_fractal(conn, "Root", &[], &[])?;
+    let programming = create_fractal(conn, "Programming", &[root.id], &[])?;
+    let python = create_fractal(conn, "Python", &[programming.id], &[programming.id])?;
+    let c_lang = create_fractal(conn, "C", &[programming.id], &[programming.id])?;
+    let rust = create_fractal(conn, "Rust", &[programming.id], &[programming.id])?;
+    let string = create_fractal(
+        conn,
+        "String",
+        &[python.id, c_lang.id, rust.id, programming.id],
+        &[programming.id],
+    )?;
+
+    // Create specific child relationships with contexts
+    // Python -> String -> .count()
+    let count_method = create_fractal(conn, ".count()", &[string.id], &[python.id])?;
+    add_has_child_edge(conn, &string.id, &count_method.id, Some(&python.id))?;
+
+    // Programming -> String -> String literal
+    let string_literal = create_fractal(conn, "String literal", &[string.id], &[programming.id])?;
+    add_has_child_edge(conn, &string.id, &string_literal.id, Some(&programming.id))?;
+
+    // Rust -> String -> &str
+    let amp_str = create_fractal(conn, "&str", &[string.id], &[rust.id])?;
+    add_has_child_edge(conn, &string.id, &amp_str.id, Some(&rust.id))?;
+
+    // C -> String has no children or could have specific children if needed
+
     Ok(())
 }
 
@@ -125,12 +163,8 @@ pub fn create_fractal(
         .ok_or_else(|| DataError::InvalidData("Failed to create fractal".to_string()))
         .and_then(|row| row_to_fractal(&row))?;
 
-    for parent_id in parent_ids {
-        add_has_child_edge(conn, parent_id, &fractal.id)?;
-    }
-
-    for context_id in context_ids {
-        add_has_context_edge(conn, &fractal.id, context_id)?;
+    for (parent_id, context_id) in parent_ids.iter().zip(context_ids.iter()) {
+        add_has_child_edge(conn, parent_id, &fractal.id, Some(context_id))?;
     }
 
     Ok(fractal)
@@ -140,14 +174,22 @@ pub fn add_has_child_edge(
     conn: &Connection,
     parent_id: &Uuid,
     child_id: &Uuid,
+    context_id: Option<&Uuid>,
 ) -> Result<(), DataError> {
     let query = "
         MATCH (parent:Fractal {id: $parent_id}), (child:Fractal {id: $child_id})
-        CREATE (parent)-[:HAS_CHILD]->(child)
-    ";
+        CREATE (parent)-[:HAS_CHILD {
+            context_id: $context_id
+        }]->(child)
+        ";
+    let context_value = match context_id {
+        Some(id) => Value::UUID(*id),
+        None => Value::Null(LogicalType::UUID),
+    };
     let params = vec![
         ("parent_id", Value::UUID(*parent_id)),
         ("child_id", Value::UUID(*child_id)),
+        ("context_id", context_value),
     ];
     let mut stmt = conn.prepare(query)?;
     conn.execute(&mut stmt, params)?;
@@ -186,6 +228,40 @@ pub fn get_fractal_by_name(conn: &Connection, name: &str) -> Result<Fractal, Dat
         .next()
         .ok_or_else(|| DataError::FractalNotFound(name.to_string()))
         .and_then(|row| row_to_fractal(&row))
+}
+
+pub fn get_children_of_fractal_with_context(
+    conn: &Connection,
+    fractal_id: &Uuid,
+    context_id: Option<&Uuid>,
+) -> Result<Vec<Fractal>, DataError> {
+    let query = match context_id {
+        Some(_) => {
+            "
+            MATCH (f:Fractal {id: $id})-[:HAS_CHILD {context_id: $context_id}]->(child:Fractal)
+            RETURN child.id, child.name, child.createdAt, child.updatedAt
+        "
+        }
+        None => {
+            "
+            MATCH (f:Fractal {id: $id})-[:HAS_CHILD]->(child:Fractal)
+            RETURN child.id, child.name, child.createdAt, child.updatedAt
+        "
+        }
+    };
+
+    let params = match context_id {
+        Some(id) => vec![
+            ("id", Value::UUID(*fractal_id)),
+            ("context_id", Value::UUID(*id)),
+        ],
+        None => vec![("id", Value::UUID(*fractal_id))],
+    };
+
+    let mut stmt = conn.prepare(query)?;
+    let result = conn.execute(&mut stmt, params)?;
+
+    result.into_iter().map(|row| row_to_fractal(&row)).collect()
 }
 
 pub fn get_fractal_relations(

@@ -15,7 +15,7 @@ pub struct FractalMutations;
 struct CreateFractalInput {
     name: String,
     parent_id: Uuid,
-    context_ids: Vec<Uuid>,
+    context_ids: Option<Uuid>,
 }
 
 #[derive(InputObject)]
@@ -35,14 +35,18 @@ impl FractalMutations {
         let db = ctx.data::<Arc<Database>>()?;
         let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
 
-        let parent_ids = vec![input.parent_id];
-        let fractal = data::create_fractal(&conn, &input.name, &parent_ids, &input.context_ids)
-            .map_err(|e| match e {
-                data::DataError::FractalAlreadyExists(_) => {
-                    GraphQLError::InvalidInput(format!("Fractal '{}' already exists", input.name))
-                }
-                _ => GraphQLError::from(e),
-            })?;
+        let fractal = data::create_fractal(
+            &conn,
+            &input.name,
+            Some(&input.parent_id),
+            input.context_ids.as_ref(),
+        )
+        .map_err(|e| match e {
+            data::DataError::FractalAlreadyExists(_) => {
+                GraphQLError::InvalidInput(format!("Fractal '{}' already exists", input.name))
+            }
+            _ => GraphQLError::from(e),
+        })?;
 
         Ok(FractalGraphQL::from(fractal))
     }

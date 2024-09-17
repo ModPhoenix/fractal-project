@@ -30,8 +30,8 @@ pub struct Knowledge {
     pub content: String,
 }
 
-pub fn create_db(db_path: &str) -> Result<Database, DataError> {
-    Database::new(db_path, SystemConfig::default()).map_err(DataError::from)
+pub fn create_db(_db_path: &str) -> Result<Database, DataError> {
+    Database::new("", SystemConfig::default()).map_err(DataError::from)
 }
 
 pub fn create_connection(db: &Database) -> Result<Connection, DataError> {
@@ -77,52 +77,49 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
     println!("Database initialization completed.");
     Ok(())
 }
+
 fn setup_example_graph(conn: &Connection) -> Result<(), DataError> {
-    // Create Fractal nodes
-    let root = create_fractal(conn, "Root", None, None)?;
-    let programming = create_fractal(conn, "Programming", Some(&root.id), None)?;
-    let python = create_fractal(conn, "Python", Some(&programming.id), Some(&programming.id))?;
-    let _c_lang = create_fractal(conn, "C", Some(&programming.id), Some(&programming.id))?;
-    let rust = create_fractal(conn, "Rust", Some(&programming.id), Some(&programming.id))?;
-    let string = create_fractal(conn, "String", Some(&programming.id), Some(&programming.id))?;
+    match create_fractal(conn, "Root", None, None) {
+        Ok(root) => {
+            // Create Fractal nodes
+            let programming = create_fractal(conn, "Programming", Some(&root.id), None)?;
+            let python =
+                create_fractal(conn, "Python", Some(&programming.id), Some(&programming.id))?;
+            let _c_lang = create_fractal(conn, "C", Some(&programming.id), Some(&programming.id))?;
+            let rust = create_fractal(conn, "Rust", Some(&programming.id), Some(&programming.id))?;
+            let string =
+                create_fractal(conn, "String", Some(&programming.id), Some(&programming.id))?;
 
-    // Create specific child relationships with contexts
-    // Python -> String -> .count()
-    let count_method = create_fractal(conn, ".count()", Some(&string.id), Some(&python.id))?;
-    add_has_child_edge(conn, &string.id, &count_method.id, Some(&python.id))?;
+            // Create specific child relationships with contexts
+            // Python -> String -> .count()
+            let count_method =
+                create_fractal(conn, ".count()", Some(&string.id), Some(&python.id))?;
+            add_has_child_edge(conn, &string.id, &count_method.id, Some(&python.id))?;
 
-    // Programming -> String -> String literal
-    let string_literal = create_fractal(
-        conn,
-        "String literal",
-        Some(&string.id),
-        Some(&programming.id),
-    )?;
-    add_has_child_edge(conn, &string.id, &string_literal.id, Some(&programming.id))?;
+            // Programming -> String -> String literal
+            let string_literal = create_fractal(
+                conn,
+                "String literal",
+                Some(&string.id),
+                Some(&programming.id),
+            )?;
+            add_has_child_edge(conn, &string.id, &string_literal.id, Some(&programming.id))?;
 
-    // Rust -> String -> &str
-    let amp_str = create_fractal(conn, "&str", Some(&string.id), Some(&rust.id))?;
-    add_has_child_edge(conn, &string.id, &amp_str.id, Some(&rust.id))?;
+            // Rust -> String -> &str
+            let amp_str = create_fractal(conn, "&str", Some(&string.id), Some(&rust.id))?;
+            add_has_child_edge(conn, &string.id, &amp_str.id, Some(&rust.id))?;
 
-    // C -> String has no children or could have specific children if needed
-
-    Ok(())
+            // C -> String has no children or could have specific children if needed
+            println!("Root fractal created.");
+            Ok(())
+        }
+        Err(DataError::FractalAlreadyExists(_)) => {
+            println!("Root fractal already exists.");
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
-
-// fn create_root_fractal(conn: &Connection) -> Result<(), DataError> {
-//     match create_fractal(conn, "Root", &[], &[]) {
-//         Ok(root) => {
-//             create_fractal(conn, "Child1", &[root.id], &[root.id])?;
-//             println!("Root fractal created.");
-//             Ok(())
-//         }
-//         Err(DataError::FractalAlreadyExists(_)) => {
-//             println!("Root fractal already exists.");
-//             Ok(())
-//         }
-//         Err(e) => Err(e),
-//     }
-// }
 
 pub fn create_fractal(
     conn: &Connection,

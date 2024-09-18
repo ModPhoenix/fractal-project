@@ -10,7 +10,7 @@ import {
   TrashIcon,
 } from "lucide-react";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import {
   ADD_RELATION,
@@ -43,20 +43,12 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useFractalVisualization, useToast } from "@/hooks";
+import { useToast } from "@/hooks";
 import { useLazyQuery, useMutation, useQuery } from "@apollo/client";
 import { DeepPartial } from "@apollo/client/utilities";
 
 export const FractalUi: React.FC = () => {
   const { data, loading, error } = useQuery(FRACTAL);
-  const { traverseAndVisualizeGraph, visualization } =
-    useFractalVisualization();
-
-  useEffect(() => {
-    if (data && data.fractal) {
-      traverseAndVisualizeGraph(data.fractal);
-    }
-  }, [data]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -69,18 +61,6 @@ export const FractalUi: React.FC = () => {
   return (
     <>
       <FractalNode fractal={data.fractal} level={0} />
-      <pre
-        className="
-        text-white
-        p-4
-        mt-4
-        rounded-md
-        overflow-x-auto
-        max-w-full
-      "
-      >
-        {visualization}
-      </pre>
     </>
   );
 };

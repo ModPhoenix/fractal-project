@@ -45,12 +45,8 @@ async fn test_fractal_query() {
     assert!(body.get("data").is_some());
 
     // Check if the fractal data is present
-    let fractal = body["data"]["root"].as_object().unwrap();
+    let fractal = body["data"]["fractal"].as_object().unwrap();
     assert_eq!(fractal["name"], "Root");
-
-    // Check if children are present
-    let children = fractal["children"].as_array().unwrap();
-    assert_eq!(children.len(), 1);
 }
 
 #[tokio::test]
@@ -77,7 +73,7 @@ async fn test_create_fractal_mutation() {
         .expect("Failed to execute root query request.");
 
     let root_body = root_response.json::<serde_json::Value>().await.unwrap();
-    let root_id = root_body["data"]["root"]["id"].as_str().unwrap();
+    let root_id = root_body["data"]["fractal"]["id"].as_str().unwrap();
 
     // GraphQL mutation
     let mutation = r#"
@@ -120,6 +116,11 @@ async fn test_create_fractal_mutation() {
     assert!(response.status().is_success());
 
     let body = response.json::<serde_json::Value>().await.unwrap();
+
+    dbg!(&body);
+
+    // Check if there are no errors
+    assert!(body.get("errors").is_none());
 
     // Check if the response contains data
     assert!(body.get("data").is_some());

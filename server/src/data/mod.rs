@@ -92,22 +92,19 @@ fn setup_example_graph(conn: &Connection) -> Result<(), DataError> {
 
             // Create specific child relationships with contexts
             // Python -> String -> .count()
-            let count_method =
+            let _count_method =
                 create_fractal(conn, ".count()", Some(&string.id), Some(&python.id))?;
-            add_has_child_edge(conn, &string.id, &count_method.id, Some(&python.id))?;
 
             // Programming -> String -> String literal
-            let string_literal = create_fractal(
+            let _string_literal = create_fractal(
                 conn,
                 "String literal",
                 Some(&string.id),
                 Some(&programming.id),
             )?;
-            add_has_child_edge(conn, &string.id, &string_literal.id, Some(&programming.id))?;
 
             // Rust -> String -> &str
-            let amp_str = create_fractal(conn, "&str", Some(&string.id), Some(&rust.id))?;
-            add_has_child_edge(conn, &string.id, &amp_str.id, Some(&rust.id))?;
+            let _amp_str = create_fractal(conn, "&str", Some(&string.id), Some(&rust.id))?;
 
             // C -> String has no children or could have specific children if needed
             println!("Root fractal created.");

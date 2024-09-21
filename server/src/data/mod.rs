@@ -83,12 +83,13 @@ fn setup_example_graph(conn: &Connection) -> Result<(), DataError> {
         Ok(root) => {
             // Create Fractal nodes
             let programming = create_fractal(conn, "Programming", Some(&root.id), None)?;
-            let python =
-                create_fractal(conn, "Python", Some(&programming.id), Some(&programming.id))?;
-            let _c_lang = create_fractal(conn, "C", Some(&programming.id), Some(&programming.id))?;
-            let rust = create_fractal(conn, "Rust", Some(&programming.id), Some(&programming.id))?;
-            let string =
-                create_fractal(conn, "String", Some(&programming.id), Some(&programming.id))?;
+            let python = create_fractal(conn, "Python", Some(&programming.id), Some(&root.id))?;
+            let _c_lang = create_fractal(conn, "C", Some(&programming.id), Some(&root.id))?;
+            let rust = create_fractal(conn, "Rust", Some(&programming.id), Some(&root.id))?;
+            let string = create_fractal(conn, "String", Some(&programming.id), Some(&root.id))?;
+
+            add_has_child_edge(conn, &python.id, &string.id, Some(&programming.id))?;
+            add_has_child_edge(conn, &rust.id, &string.id, Some(&programming.id))?;
 
             // Create specific child relationships with contexts
             // Python -> String -> .count()

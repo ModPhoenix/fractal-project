@@ -6,35 +6,22 @@ export const Fractal = graphql(/* GraphQL */ `
     name
     createdAt
     updatedAt
-    children {
-      id
-      name
-      createdAt
-      updatedAt
-      children {
-        id
-        name
-      }
-    }
-    parents {
-      id
-      name
-      createdAt
-      updatedAt
-    }
-    contexts {
-      id
-      name
-      createdAt
-      updatedAt
-    }
   }
 `);
 
 export const FRACTAL = graphql(/* GraphQL */ `
-  query Fractal($name: String) {
+  query Fractal($name: String, $childrenInput: GetFractalChildrenInput!) {
     fractal(name: $name) {
       ...Fractal
+      children(input: $childrenInput) {
+        ...Fractal
+      }
+      parents {
+        ...Fractal
+      }
+      contexts {
+        ...Fractal
+      }
     }
   }
 `);
@@ -48,8 +35,8 @@ export const CREATE_FRACTAL = graphql(/* GraphQL */ `
 `);
 
 export const ADD_RELATION = graphql(/* GraphQL */ `
-  mutation AddRelation($parentId: UUID!, $childId: UUID!) {
-    addRelation(parentId: $parentId, childId: $childId)
+  mutation AddRelation($parentId: UUID!, $childId: UUID!, $contextId: UUID) {
+    addRelation(parentId: $parentId, childId: $childId, contextId: $contextId)
   }
 `);
 

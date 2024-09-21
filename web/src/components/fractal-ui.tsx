@@ -48,7 +48,9 @@ import { useLazyQuery, useMutation, useQuery } from "@apollo/client";
 import { DeepPartial } from "@apollo/client/utilities";
 
 export const FractalUi: React.FC = () => {
-  const { data, loading, error } = useQuery(FRACTAL);
+  const { data, loading, error } = useQuery(FRACTAL, {
+    variables: { name: "Root", childrenInput: { contextId: null } },
+  });
 
   if (loading) {
     return <div>Loading...</div>;
@@ -65,22 +67,22 @@ export const FractalUi: React.FC = () => {
   );
 };
 
-type DialogType = "fractal" | "context" | "knowledge";
+type DialogType = "fractal" | "relation" | "knowledge";
 
 const FractalNode: React.FC<{
   fractal: DeepPartial<FractalGraphQl>;
   level: number;
-  parentName?: string;
-}> = ({ fractal, level, parentName }) => {
+  parent?: DeepPartial<FractalGraphQl>;
+}> = ({ fractal, level, parent }) => {
   const [isExpanded, setIsExpanded] = useState(level === 0);
   const [dialogState, setDialogState] = useState<Record<DialogType, boolean>>({
     fractal: false,
-    context: false,
+    relation: false,
     knowledge: false,
   });
   const [inputState, setInputState] = useState<Record<DialogType, string>>({
     fractal: "",
-    context: "",
+    relation: "",
     knowledge: "",
   });
   const { toast } = useToast();
@@ -92,8 +94,8 @@ const FractalNode: React.FC<{
     refetchQueries: [{ query: FRACTAL, variables: { name: fractal.name } }],
   });
   const [deleteFractal] = useMutation(DELETE_FRACTAL, {
-    refetchQueries: parentName
-      ? [{ query: FRACTAL, variables: { name: parentName } }]
+    refetchQueries: parent?.name
+      ? [{ query: FRACTAL, variables: { name: parent.name } }]
       : [],
   });
   const [addRelation] = useMutation(ADD_RELATION, {
@@ -141,15 +143,16 @@ const FractalNode: React.FC<{
           input: {
             name: inputValue,
             parentId: fractal.id,
-            contextIds: [fractal.id],
+            contextIds: parent?.id,
           },
         },
       });
-    } else if (type === "context") {
+    } else if (type === "relation") {
       addRelation({
         variables: {
           parentId: fractal.id,
           childId: inputValue,
+          contextId: parent?.id,
         },
       });
     } else {
@@ -226,7 +229,7 @@ const FractalNode: React.FC<{
 
   const dialogConfigs: { type: DialogType; icon: React.ReactNode }[] = [
     { type: "fractal", icon: <PlusCircleIcon className="w-4 h-4" /> },
-    { type: "context", icon: <LinkIcon className="w-4 h-4" /> },
+    { type: "relation", icon: <LinkIcon className="w-4 h-4" /> },
     { type: "knowledge", icon: <BookIcon className="w-4 h-4" /> },
   ];
 
@@ -266,7 +269,12 @@ const FractalNode: React.FC<{
           variant="outline"
           onClick={async () => {
             if (!fractal.children) {
-              await getFractal({ variables: { name: fractal.name } });
+              await getFractal({
+                variables: {
+                  name: fractal.name,
+                  childrenInput: { contextId: parent?.id },
+                },
+              });
             }
             setIsExpanded((prev) => !prev);
           }}
@@ -327,7 +335,7 @@ const FractalNode: React.FC<{
                   key={child.id}
                   fractal={child}
                   level={level + 1}
-                  parentName={fractal.name}
+                  parent={fractal}
                 />
               )
           )}

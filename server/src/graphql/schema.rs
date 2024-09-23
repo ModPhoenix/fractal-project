@@ -5,7 +5,9 @@ use crate::data::{self, Fractal};
 use async_graphql::{
     Context, EmptySubscription, InputObject, MergedObject, Object, Result, Schema,
 };
+use chrono::{DateTime, Utc};
 use kuzu::Database;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -15,7 +17,7 @@ pub struct FractalMutations;
 struct CreateFractalInput {
     name: String,
     parent_id: Uuid,
-    context_ids: Option<Uuid>,
+    context_ids: Vec<Uuid>,
 }
 
 #[derive(InputObject)]
@@ -35,11 +37,13 @@ impl FractalMutations {
         let db = ctx.data::<Arc<Database>>()?;
         let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
 
+        let context_id = input.context_ids.first().cloned();
+
         let fractal = data::create_fractal(
             &conn,
             &input.name,
             Some(&input.parent_id),
-            input.context_ids.as_ref(),
+            context_id.as_ref(),
         )
         .map_err(|e| match e {
             data::DataError::FractalAlreadyExists(_) => {
@@ -117,6 +121,9 @@ impl FractalQueries {
             name: fractal.name,
             created_at: fractal.created_at,
             updated_at: fractal.updated_at,
+            parents: vec![],
+            children: vec![],
+            contexts: vec![],
         })
     }
 
@@ -147,11 +154,15 @@ struct GetFractalChildrenInput {
     context_id: Option<Uuid>,
 }
 
-struct FractalGraphQL {
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct FractalGraphQL {
     id: Uuid,
     name: String,
-    created_at: chrono::DateTime<chrono::Utc>,
-    updated_at: chrono::DateTime<chrono::Utc>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    parents: Vec<FractalGraphQL>,
+    children: Vec<FractalGraphQL>,
+    contexts: Vec<FractalGraphQL>,
 }
 
 #[Object]
@@ -166,15 +177,16 @@ impl FractalGraphQL {
     async fn children(
         &self,
         ctx: &Context<'_>,
-        input: GetFractalChildrenInput,
+        input: Option<GetFractalChildrenInput>,
     ) -> Result<Vec<FractalGraphQL>> {
         let db = ctx.data::<Arc<Database>>()?;
         let conn = data::create_connection(&db).map_err(GraphQLError::from)?;
 
-        let context_id: Option<&Uuid> = input.context_id.as_ref();
+        let context_id = input.and_then(|i| i.context_id);
 
-        let children = data::get_children_of_fractal_with_context(&conn, &self.id, context_id)
-            .map_err(GraphQLError::from)?;
+        let children =
+            data::get_children_of_fractal_with_context(&conn, &self.id, context_id.as_ref())
+                .map_err(GraphQLError::from)?;
 
         Ok(children.into_iter().map(FractalGraphQL::from).collect())
     }
@@ -238,6 +250,9 @@ impl From<Fractal> for FractalGraphQL {
             name: f.name,
             created_at: f.created_at,
             updated_at: f.updated_at,
+            parents: vec![],
+            children: vec![],
+            contexts: vec![],
         }
     }
 }

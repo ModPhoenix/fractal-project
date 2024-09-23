@@ -1,4 +1,6 @@
-use server::data::{create_db, init_database};
+use server::data::{
+    create_db, create_fractal_raw, init_database, setup_example_graph, DataError, FRACTAL_ROOT_ID,
+};
 use server::run;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -23,6 +25,15 @@ async fn main() -> Result<(), std::io::Error> {
         let conn = server::data::create_connection(&db)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         init_database(&conn).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        match create_fractal_raw(&conn, "Root", None, None, Some(FRACTAL_ROOT_ID)) {
+            Ok(_) => setup_example_graph(&conn),
+            Err(DataError::FractalAlreadyExists(_)) => {
+                println!("Root fractal already exists.");
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
     } // conn is dropped here
 
     run(listener, db)?.await

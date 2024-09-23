@@ -30,6 +30,8 @@ pub struct Knowledge {
     pub content: String,
 }
 
+pub const FRACTAL_ROOT_ID: Uuid = Uuid::nil();
+
 pub fn create_db(_db_path: &str) -> Result<Database, DataError> {
     Database::new("", SystemConfig::default()).map_err(DataError::from)
 }
@@ -72,58 +74,57 @@ pub fn init_database(conn: &Connection) -> Result<(), DataError> {
 
     println!("Database tables created.");
 
-    setup_example_graph(conn)?;
-
     println!("Database initialization completed.");
     Ok(())
 }
 
-fn setup_example_graph(conn: &Connection) -> Result<(), DataError> {
-    match create_fractal(conn, "Root", None, None) {
-        Ok(root) => {
-            // Create Fractal nodes
-            let programming = create_fractal(conn, "Programming", Some(&root.id), None)?;
-            let python = create_fractal(conn, "Python", Some(&programming.id), Some(&root.id))?;
-            let _c_lang = create_fractal(conn, "C", Some(&programming.id), Some(&root.id))?;
-            let rust = create_fractal(conn, "Rust", Some(&programming.id), Some(&root.id))?;
-            let string = create_fractal(conn, "String", Some(&programming.id), Some(&root.id))?;
+pub fn setup_example_graph(conn: &Connection) -> Result<(), DataError> {
+    // Create Fractal nodes
+    let programming = create_fractal(conn, "Programming", Some(&FRACTAL_ROOT_ID), None)?;
+    let python = create_fractal(
+        conn,
+        "Python",
+        Some(&programming.id),
+        Some(&FRACTAL_ROOT_ID),
+    )?;
+    let _c_lang = create_fractal(conn, "C", Some(&programming.id), Some(&FRACTAL_ROOT_ID))?;
+    let rust = create_fractal(conn, "Rust", Some(&programming.id), Some(&FRACTAL_ROOT_ID))?;
+    let string = create_fractal(
+        conn,
+        "String",
+        Some(&programming.id),
+        Some(&FRACTAL_ROOT_ID),
+    )?;
 
-            add_has_child_edge(conn, &python.id, &string.id, Some(&programming.id))?;
-            add_has_child_edge(conn, &rust.id, &string.id, Some(&programming.id))?;
+    add_has_child_edge(conn, &python.id, &string.id, Some(&programming.id))?;
+    add_has_child_edge(conn, &rust.id, &string.id, Some(&programming.id))?;
 
-            // Create specific child relationships with contexts
-            // Python -> String -> .count()
-            let _count_method =
-                create_fractal(conn, ".count()", Some(&string.id), Some(&python.id))?;
+    // Create specific child relationships with contexts
+    // Python -> String -> .count()
+    let _count_method = create_fractal(conn, ".count()", Some(&string.id), Some(&python.id))?;
 
-            // Programming -> String -> String literal
-            let _string_literal = create_fractal(
-                conn,
-                "String literal",
-                Some(&string.id),
-                Some(&programming.id),
-            )?;
+    // Programming -> String -> String literal
+    let _string_literal = create_fractal(
+        conn,
+        "String literal",
+        Some(&string.id),
+        Some(&programming.id),
+    )?;
 
-            // Rust -> String -> &str
-            let _amp_str = create_fractal(conn, "&str", Some(&string.id), Some(&rust.id))?;
+    // Rust -> String -> &str
+    let _amp_str = create_fractal(conn, "&str", Some(&string.id), Some(&rust.id))?;
 
-            // C -> String has no children or could have specific children if needed
-            println!("Root fractal created.");
-            Ok(())
-        }
-        Err(DataError::FractalAlreadyExists(_)) => {
-            println!("Root fractal already exists.");
-            Ok(())
-        }
-        Err(e) => Err(e),
-    }
+    // C -> String has no children or could have specific children if needed
+    println!("Root fractal created.");
+    Ok(())
 }
 
-pub fn create_fractal(
+pub fn create_fractal_raw(
     conn: &Connection,
     name: &str,
     parent_id: Option<&Uuid>,
     context_id: Option<&Uuid>,
+    uuid: Option<Uuid>,
 ) -> Result<Fractal, DataError> {
     if get_fractal_by_name(conn, name).is_ok() {
         return Err(DataError::FractalAlreadyExists(name.to_string()));
@@ -139,11 +140,12 @@ pub fn create_fractal(
         RETURN f.id, f.name, f.createdAt, f.updatedAt
     ";
 
+    let id = uuid.unwrap_or_else(Uuid::new_v4);
     let system_time = SystemTime::now();
     let datetime = OffsetDateTime::from(system_time);
 
     let params = vec![
-        ("uuid", Value::UUID(Uuid::new_v4())),
+        ("uuid", Value::UUID(id)),
         ("name", Value::String(name.to_string())),
         ("datetime", Value::Timestamp(datetime)),
     ];
@@ -162,6 +164,15 @@ pub fn create_fractal(
     }
 
     Ok(fractal)
+}
+
+pub fn create_fractal(
+    conn: &Connection,
+    name: &str,
+    parent_id: Option<&Uuid>,
+    context_id: Option<&Uuid>,
+) -> Result<Fractal, DataError> {
+    create_fractal_raw(conn, name, parent_id, context_id, None)
 }
 
 pub fn add_has_child_edge(

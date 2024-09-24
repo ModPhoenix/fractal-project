@@ -1,5 +1,4 @@
 import {
-  Book,
   Code2,
   LifeBuoy,
   Settings2,
@@ -73,7 +72,6 @@ export const Navigation: FC = () => {
           icon={<ListTree className="size-5" />}
         />
         <NavItem label="API" icon={<Code2 className="size-5" />} />
-        <NavItem label="Documentation" icon={<Book className="size-5" />} />
         <NavItem label="Settings" icon={<Settings2 className="size-5" />} />
       </nav>
       <nav className="mt-auto grid gap-1 p-2">

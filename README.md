@@ -1,6 +1,6 @@
 # Fractal project
 
-Fractal is an innovative platform that creates a context-based interconnected digital repository of knowledge, mapping information and its dependencies. It allows users to:
+Fractal creates a context-based interconnected digital repository of knowledge, mapping information and its dependencies. It allows users to:
 
 - Explore the context-based interconnected knowledge graph
 - Create and share knowledge trees

@@ -17,11 +17,11 @@ Fractal helps individuals understand their own capabilities while enabling organ
 
 Key features:
 
-- Explore interconnected knowledge graph
-- Knowledge mapping and visualization
-- Peer validation of skills
-- Competency assessment for hiring and development
-- Educational content creation and sharing
+- 🌐 Explore interconnected knowledge graph
+- 🗺️ Knowledge mapping and visualization
+- 👥 Peer validation of skills
+- 📊 Competency assessment for hiring and development
+- 📚 Educational content creation and sharing
 
 Fractal has applications for individuals, professionals, businesses, recruiters, and academic institutions. Join us in building the future of knowledge management and skills assessment!
 

@@ -2,13 +2,13 @@
 
 Fractal creates a context-based interconnected digital repository of knowledge, mapping information and its dependencies. It allows users to:
 
-- Explore the context-based interconnected knowledge graph
-- Create and share knowledge trees
-- Create educational content
-- Create snapshots (sub-graphs) of knowledge areas (Frontend, Backend, DevOps, Sales, Marketing, etc.)
-- Map their own knowledge onto a shared knowledge tree
-- Compare their knowledge with others
-- Get their expertise validated by others
+- 🌐 Explore the context-based interconnected knowledge graph
+- 🌳 Create and share knowledge trees
+- 📚 Create educational content
+- 📸 Create snapshots (sub-graphs) of knowledge areas (Frontend, Backend, DevOps, Sales, Marketing, etc.)
+- 🧑 Map their own knowledge onto a shared knowledge tree
+- 🤝 Compare their knowledge with others
+- 🔍 Get their expertise validated by others
 - Visualize their skills and competencies
 - [Potential] for creating a real-time history platform of our reality, similar to Wikipedia
 - [Potential] for social news network for current things happening in the world

@@ -9,7 +9,7 @@ Fractal creates a context-based interconnected digital repository of knowledge, 
 - 🧑 Map their own knowledge onto a shared knowledge tree
 - 🤝 Compare their knowledge with others
 - 🔍 Get their expertise validated by others
-- Visualize their skills and competencies
+- 📊 Visualize their skills and competencies
 - [Potential] for creating a real-time history platform of our reality, similar to Wikipedia
 - [Potential] for social news network for current things happening in the world
 

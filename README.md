@@ -84,7 +84,7 @@ We are not yet at a stage for public release or wide-scale testing. However, we'
 
 Creating a context-based interconnected digital repository of knowledge is an ambitious and impactful project. To effectively develop such a system, consider the following steps and best practices:
 
-1. **Define Clear Objectives and Scope**
+1. 🎯 **Define Clear Objectives and Scope**
 
    - **Specify Use Cases**: Clearly outline the primary use cases your platform will serve, such as educational content sharing, skill assessment, or historical event mapping.
    - **Identify Target Users**: Determine who will benefit most from your platform—students, professionals, organizations, or educational institutions.

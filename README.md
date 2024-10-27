@@ -89,7 +89,7 @@ Creating a context-based interconnected digital repository of knowledge is an am
    - **Specify Use Cases**: Clearly outline the primary use cases your platform will serve, such as educational content sharing, skill assessment, or historical event mapping.
    - **Identify Target Users**: Determine who will benefit most from your platform—students, professionals, organizations, or educational institutions.
 
-2. **Design a Robust Data Model**
+2. 📊 **Design a Robust Data Model**
 
    - **Utilize Graph Databases**: Since your project relies on interconnected data, a graph database like Neo4j is suitable. Your current Cypher schema is a good starting point.
    - **Refine Entity Relationships**: Ensure that relationships like `HAS_CHILD`, `PROVIDES_CONTEXT_FOR`, and `HAS_KNOWLEDGE` accurately represent the connections between knowledge units.
